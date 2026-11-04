@@ -46,12 +46,12 @@ export class DrawingEngine {
     return 'crosshair';
   }
 
-  onPointerDown(point, isShift, zoom) {
+  onPointerDown(point, isShift, zoom, isTouch = false) {
     const { activeTool } = this.store.getState();
     const tool = this.tools[activeTool];
 
     if (activeTool === 'selection') {
-      return tool.onPointerDown(point, isShift, zoom);
+      return tool.onPointerDown(point, isShift, zoom, isTouch);
     }
     if (activeTool === 'eraser') {
       tool.onPointerDown(point, zoom);

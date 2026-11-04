@@ -44,7 +44,7 @@ export class SelectionTool {
     return 'default';
   }
 
-  onPointerDown(point, isShift, zoom) {
+  onPointerDown(point, isShift, zoom, isTouch = false) {
     const { elements, selectedIds, setSelectedIds, toggleSelectedId, clearSelection } = this.store.getState();
     const selectedElements = elements.filter((e) => selectedIds.includes(e.id));
     this.dragStart = { ...point };
@@ -55,7 +55,7 @@ export class SelectionTool {
     // 1. Check if clicking on a resize handle of existing selection
     if (selectedElements.length > 0) {
       const bounds = getElementsBounds(selectedElements);
-      const handleHit = this.selectionManager.getHandle(point, bounds, zoom);
+      const handleHit = this.selectionManager.getHandle(point, bounds, zoom, isTouch);
       if (handleHit) {
         this.mode = 'resizing';
         this.selectionManager.startResize(handleHit.handle, point, selectedElements);

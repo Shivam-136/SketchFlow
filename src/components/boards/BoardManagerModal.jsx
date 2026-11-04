@@ -234,7 +234,7 @@ export function BoardManagerModal() {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-zinc-900/40 dark:bg-black/60 backdrop-blur-sm animate-in fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-zinc-900/40 dark:bg-black/60 backdrop-blur-sm animate-in fade-in">
       {/* Backdrop click to dismiss */}
       <div
         className="fixed inset-0"
@@ -246,23 +246,23 @@ export function BoardManagerModal() {
 
       {/* Main Dialog Container */}
       <div
-        className="relative w-full max-w-4xl max-h-[88vh] bg-white dark:bg-zinc-900 rounded-3xl shadow-sketch-lg border border-zinc-200 dark:border-zinc-800 flex flex-col z-10 overflow-hidden text-zinc-800 dark:text-zinc-100 transition-colors duration-200"
+        className="relative w-full max-w-4xl max-h-[92vh] sm:max-h-[88vh] bg-white dark:bg-zinc-900 rounded-2xl sm:rounded-3xl shadow-sketch-lg border border-zinc-200 dark:border-zinc-800 flex flex-col z-10 overflow-hidden text-zinc-800 dark:text-zinc-100 transition-colors duration-200"
         onClick={() => setMenuState(null)}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-900/60 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
-              <LayoutGrid className="w-5 h-5" />
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 flex-shrink-0">
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-900/60 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
+              <LayoutGrid className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100">Whiteboards</h2>
-                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
+                <h2 className="text-sm sm:text-base font-bold text-zinc-900 dark:text-zinc-100">Whiteboards</h2>
+                <span className="text-[11px] sm:text-xs font-semibold px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
                   {boardsList.length}
                 </span>
               </div>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">Manage, switch, and organize your canvases</p>
+              <p className="text-[11px] sm:text-xs text-zinc-500 dark:text-zinc-400 hidden xs:block sm:block">Manage, switch, and organize your canvases</p>
             </div>
           </div>
 
@@ -270,15 +270,16 @@ export function BoardManagerModal() {
             <button
               type="button"
               onClick={handleCreateNew}
-              className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 active:scale-95 rounded-xl shadow-sm transition-all"
+              className="flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 active:scale-95 rounded-xl shadow-sm transition-all"
             >
               <Plus className="w-4 h-4" />
-              <span>Create New Board</span>
+              <span className="hidden sm:inline">Create New Board</span>
+              <span className="sm:hidden">New</span>
             </button>
             <button
               type="button"
               onClick={() => setShow(false)}
-              className="p-2 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors"
+              className="p-1.5 sm:p-2 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors"
               aria-label="Close"
             >
               <X className="w-5 h-5" />
@@ -287,7 +288,7 @@ export function BoardManagerModal() {
         </div>
 
         {/* Search & Sort Controls */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 px-6 py-3 border-b border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex-shrink-0">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 px-4 sm:px-6 py-2.5 sm:py-3 border-b border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex-shrink-0">
           {/* Search bar */}
           <div className="relative flex-1">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
@@ -316,7 +317,7 @@ export function BoardManagerModal() {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="text-xs bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200/80 dark:border-zinc-700/80 rounded-xl px-2.5 py-2 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all cursor-pointer"
+              className="w-full sm:w-auto text-xs bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200/80 dark:border-zinc-700/80 rounded-xl px-2.5 py-2 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all cursor-pointer"
             >
               <option value="updated-desc">Recently Modified</option>
               <option value="created-desc">Creation Date (Newest)</option>
@@ -329,11 +330,11 @@ export function BoardManagerModal() {
         </div>
 
         {/* Board Cards Grid */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-3 sm:p-6">
           {filteredAndSortedBoards.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <div className="w-14 h-14 rounded-2xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-400 mb-3">
-                <LayoutGrid className="w-7 h-7" />
+            <div className="flex flex-col items-center justify-center py-12 sm:py-16 text-center">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-400 mb-3">
+                <LayoutGrid className="w-6 h-6 sm:w-7 sm:h-7" />
               </div>
               <h3 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
                 {searchQuery ? `No whiteboards match "${searchQuery}"` : 'No whiteboards yet'}
@@ -362,7 +363,7 @@ export function BoardManagerModal() {
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
               {filteredAndSortedBoards.map((board) => {
                 const isActive = board.id === activeBoardId;
                 const isMenuOpen = menuState?.board?.id === board.id;
@@ -461,20 +462,20 @@ export function BoardManagerModal() {
         </div>
 
         {/* Footer info bar */}
-        <div className="flex items-center justify-between px-6 py-3 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/40 dark:bg-zinc-900/40 text-[11px] text-zinc-400 flex-shrink-0">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-2.5 sm:py-3 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/40 dark:bg-zinc-900/40 text-[10px] sm:text-[11px] text-zinc-400 flex-shrink-0">
           <span>{filteredAndSortedBoards.length} of {boardsList.length} whiteboards shown</span>
-          <span>Auto-persisted in local IndexedDB</span>
+          <span className="hidden xs:inline sm:inline">Auto-persisted in local IndexedDB</span>
         </div>
       </div>
 
       {/* Rename Board Dialog Modal */}
       {renamingBoard && (
         <div
-          className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-zinc-900/50 dark:bg-black/70 backdrop-blur-sm animate-in fade-in"
+          className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-4 bg-zinc-900/50 dark:bg-black/70 backdrop-blur-sm animate-in fade-in"
           onClick={() => setRenamingBoard(null)}
         >
           <div
-            className="relative w-full max-w-sm bg-white dark:bg-zinc-900 rounded-2xl shadow-sketch-lg border border-zinc-200 dark:border-zinc-800 p-5 flex flex-col gap-4 animate-in zoom-in-95"
+            className="relative w-full max-w-[calc(100vw-2rem)] sm:max-w-sm bg-white dark:bg-zinc-900 rounded-2xl shadow-sketch-lg border border-zinc-200 dark:border-zinc-800 p-4 sm:p-5 flex flex-col gap-4 animate-in zoom-in-95"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between">
@@ -532,11 +533,11 @@ export function BoardManagerModal() {
       {/* Delete Confirmation Modal */}
       {deletingBoard && (
         <div
-          className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-zinc-900/50 dark:bg-black/70 backdrop-blur-sm animate-in fade-in"
+          className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-4 bg-zinc-900/50 dark:bg-black/70 backdrop-blur-sm animate-in fade-in"
           onClick={() => !isDeleting && setDeletingBoard(null)}
         >
           <div
-            className="relative w-full max-w-sm bg-white dark:bg-zinc-900 rounded-2xl shadow-sketch-lg border border-zinc-200 dark:border-zinc-800 p-5 flex flex-col gap-4 animate-in zoom-in-95"
+            className="relative w-full max-w-[calc(100vw-2rem)] sm:max-w-sm bg-white dark:bg-zinc-900 rounded-2xl shadow-sketch-lg border border-zinc-200 dark:border-zinc-800 p-4 sm:p-5 flex flex-col gap-4 animate-in zoom-in-95"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start gap-3">

@@ -327,7 +327,15 @@ export function Whiteboard() {
         panOffset: { ...panOffset },
         midPoint: mid
       };
+      // Cancel any accidental 1-finger stroke started when finger 1 hit before finger 2
+      if (engineRef.current.previewElement) {
+        engineRef.current.previewElement = null;
+      }
+      if (engineRef.current.getTool('selection').mode !== 'idle') {
+        engineRef.current.getTool('selection').mode = 'idle';
+      }
       isPointerDownRef.current = false;
+      renderCanvas();
       return;
     }
 
@@ -370,7 +378,8 @@ export function Whiteboard() {
     }
 
     isPointerDownRef.current = true;
-    engineRef.current.onPointerDown(canvasPoint, e.shiftKey, zoom);
+    const isTouch = e.pointerType === 'touch';
+    engineRef.current.onPointerDown(canvasPoint, e.shiftKey, zoom, isTouch);
     renderCanvas();
   };
 
@@ -631,12 +640,46 @@ export function Whiteboard() {
             }}
             rows={Math.max(1, (editingText.text.split('\n').length || 1))}
           />
-          <div className="flex items-center gap-2 text-[10px] text-zinc-600 dark:text-zinc-300 bg-white/95 dark:bg-zinc-900/95 px-2 py-0.5 rounded shadow mt-1 border border-zinc-200 dark:border-zinc-800 pointer-events-none select-none">
-            <span><strong>Enter</strong>: new line</span>
-            <span>•</span>
-            <span><strong>Ctrl+Enter</strong>: commit</span>
-            <span>•</span>
-            <span><strong>Esc</strong>: cancel</span>
+          <div
+            data-text-control="true"
+            className="flex items-center justify-between gap-2 text-[10px] text-zinc-600 dark:text-zinc-300 bg-white/95 dark:bg-zinc-900/95 px-2.5 py-1 rounded-lg shadow-md mt-1 border border-zinc-200 dark:border-zinc-800 select-none pointer-events-auto"
+          >
+            <div className="hidden sm:flex items-center gap-1.5">
+              <span><strong>Enter</strong>: new line</span>
+              <span>•</span>
+              <span><strong>Ctrl+Enter</strong>: commit</span>
+              <span>•</span>
+              <span><strong>Esc</strong>: cancel</span>
+            </div>
+            <div className="flex sm:hidden items-center text-[10px] text-zinc-400">
+              Tap Done to commit
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                data-text-control="true"
+                onPointerDown={(e) => e.preventDefault()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  cancelTextEditor();
+                }}
+                className="px-2 py-0.5 rounded text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                data-text-control="true"
+                onPointerDown={(e) => e.preventDefault()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  commitTextEditor();
+                }}
+                className="px-2.5 py-0.5 rounded bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-xs"
+              >
+                Done
+              </button>
+            </div>
           </div>
         </div>
       )}

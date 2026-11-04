@@ -74,3 +74,29 @@ body {
   cursor: text;
 }
 
+/* Safe-area insets for mobile edge-to-edge & notch displays */
+.pb-safe {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
+}
+.pt-safe {
+  padding-top: max(0.5rem, env(safe-area-inset-top, 0px));
+}
+.pl-safe {
+  padding-left: max(0.5rem, env(safe-area-inset-left, 0px));
+}
+.pr-safe {
+  padding-right: max(0.5rem, env(safe-area-inset-right, 0px));
+}
+.mb-safe {
+  margin-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
+}
+
+/* Hide scrollbar for clean horizontal mobile toolbar */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+

@@ -27,14 +27,14 @@ export function ColorPicker({
   return (
     <div className="flex flex-col gap-1.5">
       {label && <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">{label}</span>}
-      <div className="flex items-center flex-wrap gap-1.5">
+      <div className="flex items-center flex-wrap gap-2 sm:gap-1.5">
         {allowTransparent && (
           <button
             type="button"
             onClick={() => onChange('transparent')}
             title="Transparent"
             className={`
-              w-6 h-6 rounded-md flex items-center justify-center border transition-transform
+              w-7 h-7 sm:w-6 sm:h-6 rounded-lg sm:rounded-md flex items-center justify-center border transition-transform
               ${value === 'transparent' ? 'ring-2 ring-indigo-500 ring-offset-1 border-transparent scale-105' : 'border-zinc-300 dark:border-zinc-700 hover:scale-105'}
               bg-white dark:bg-zinc-800 relative overflow-hidden
             `}
@@ -55,7 +55,7 @@ export function ColorPicker({
               title={color}
               style={{ backgroundColor: color }}
               className={`
-                w-6 h-6 rounded-md border transition-transform
+                w-7 h-7 sm:w-6 sm:h-6 rounded-lg sm:rounded-md border transition-transform
                 ${
                   isSelected
                     ? 'ring-2 ring-indigo-500 ring-offset-1 border-transparent scale-105 shadow-sm'
@@ -76,9 +76,9 @@ export function ColorPicker({
             type="button"
             onClick={() => customColorInputRef.current?.click()}
             title="Custom Color"
-            className="w-6 h-6 rounded-md border border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-500 bg-zinc-50 dark:bg-zinc-800 flex items-center justify-center text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white transition-colors"
+            className="w-7 h-7 sm:w-6 sm:h-6 rounded-lg sm:rounded-md border border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-500 bg-zinc-50 dark:bg-zinc-800 flex items-center justify-center text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white transition-colors"
           >
-            <Pipette className="w-3 h-3" />
+            <Pipette className="w-3.5 h-3.5" />
           </button>
           <input
             ref={customColorInputRef}

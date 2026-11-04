@@ -15,6 +15,7 @@ import { useCanvasStore } from '../../store/canvasStore';
 import { IconButton } from '../common/IconButton';
 import { screenToCanvas } from '../../utils/canvasUtils';
 import { createImageElementFromFile } from '../../utils/imageUtils';
+import { useIsMobile } from '../../hooks/useMediaQuery';
 
 // Custom clean Diamond Icon
 function DiamondIcon({ className, strokeWidth = 2 }) {
@@ -48,6 +49,7 @@ const TOOLS = [
 ];
 
 export function Toolbar() {
+  const isMobile = useIsMobile();
   const activeTool = useCanvasStore((s) => s.activeTool);
   const setActiveTool = useCanvasStore((s) => s.setActiveTool);
   const addElement = useCanvasStore((s) => s.addElement);
@@ -84,7 +86,13 @@ export function Toolbar() {
   };
 
   return (
-    <div className="fixed top-3 left-1/2 -translate-x-1/2 z-40 pointer-events-auto">
+    <div
+      className={
+        isMobile
+          ? 'fixed bottom-3 left-1/2 -translate-x-1/2 z-40 w-[calc(100vw-1.5rem)] max-w-md pointer-events-auto mb-safe'
+          : 'fixed top-3 left-1/2 -translate-x-1/2 z-40 pointer-events-auto'
+      }
+    >
       <input
         ref={fileInputRef}
         type="file"
@@ -95,7 +103,11 @@ export function Toolbar() {
       />
       <nav
         aria-label="Drawing Tools"
-        className="flex items-center gap-1 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md px-2 py-1.5 rounded-2xl shadow-sketch border border-zinc-200/80 dark:border-zinc-800 transition-colors duration-200"
+        className={
+          isMobile
+            ? 'flex items-center gap-1.5 overflow-x-auto no-scrollbar touch-pan-x px-2 py-1.5 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md rounded-2xl shadow-sketch-lg border border-zinc-200/90 dark:border-zinc-800 transition-colors duration-200 select-none'
+            : 'flex items-center gap-1 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md px-2 py-1.5 rounded-2xl shadow-sketch border border-zinc-200/80 dark:border-zinc-800 transition-colors duration-200'
+        }
       >
         {TOOLS.map((tool) => (
           <IconButton
@@ -105,8 +117,8 @@ export function Toolbar() {
             shortcut={tool.shortcut}
             isActive={activeTool === tool.id}
             onClick={() => handleToolClick(tool.id)}
-            size="md"
-            position="bottom"
+            size={isMobile ? 'touch' : 'md'}
+            position={isMobile ? 'top' : 'bottom'}
           />
         ))}
       </nav>

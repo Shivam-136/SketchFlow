@@ -13,7 +13,12 @@ export function Tooltip({ text, shortcut, children, position = 'bottom' }) {
   return (
     <div
       className="relative flex items-center justify-center"
-      onMouseEnter={() => setIsVisible(true)}
+      onMouseEnter={() => {
+        if (typeof window !== 'undefined' && typeof window.matchMedia === 'function' && !window.matchMedia('(hover: hover)').matches) {
+          return;
+        }
+        setIsVisible(true);
+      }}
       onMouseLeave={() => setIsVisible(false)}
     >
       {children}

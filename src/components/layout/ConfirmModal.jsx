@@ -15,12 +15,12 @@ export function ConfirmModal() {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/40 dark:bg-black/60 backdrop-blur-sm animate-in fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-zinc-900/40 dark:bg-black/60 backdrop-blur-sm animate-in fade-in">
       <div
         className="fixed inset-0"
         onClick={() => setShow(false)}
       />
-      <div className="relative w-full max-w-sm bg-white dark:bg-zinc-900 rounded-2xl shadow-sketch-lg border border-zinc-200 dark:border-zinc-800 p-5 z-10 flex flex-col gap-4 animate-in zoom-in-95 text-zinc-800 dark:text-zinc-100 transition-colors duration-200">
+      <div className="relative w-full max-w-[calc(100vw-2rem)] sm:max-w-sm bg-white dark:bg-zinc-900 rounded-2xl shadow-sketch-lg border border-zinc-200 dark:border-zinc-800 p-4 sm:p-5 z-10 flex flex-col gap-4 animate-in zoom-in-95 text-zinc-800 dark:text-zinc-100 transition-colors duration-200">
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-100 dark:border-rose-900/60 flex items-center justify-center text-rose-600 dark:text-rose-400 flex-shrink-0">
             <AlertTriangle className="w-5 h-5" />

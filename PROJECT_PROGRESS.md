@@ -1,6 +1,6 @@
 # SketchFlow — Project Documentation & Engineering Progress
 
-**Document Version:** 1.3.1  
+**Document Version:** 1.4.0  
 **Last Updated:** November 2026  
 **Project Name:** SketchFlow  
 **Project Type:** Excalidraw-inspired Online Whiteboard Application  
@@ -510,6 +510,30 @@ When switching between boards:
 
 ---
 
+### 3.5 Mobile Responsive & Touch System Architecture (v1.4.0)
+
+SketchFlow incorporates a fully responsive, touch-first mobile architecture providing parity across smartphone viewports (320px–480px), large phones (481px–640px), tablets (641px–1024px), and desktop displays (1025px+):
+
+1. **Responsive Viewport Adaptation Strategy:**
+   - **Desktop Layout Preserved:** Floating top-center toolbar, floating left Properties Panel, standard top Navbar, and multi-island bottom controls remain unaltered on desktop screens.
+   - **Mobile Bottom Toolbar:** On screens `< 768px`, the drawing toolbar automatically relocates to the bottom of the viewport (`bottom-3 left-1/2 -translate-x-1/2 mb-safe`), featuring smooth horizontal scrolling (`overflow-x-auto no-scrollbar touch-pan-x`) and touch-target sizing (`size="touch"`, min 44 × 44 CSS pixels) for all 11 drawing tools.
+   - **Properties Slide-Up Drawer:** Properties Panel converts into an ergonomic floating "Style" pill at `bottom-20 right-3 mb-safe` with live color indicator. Tapping opens a full-featured slide-up bottom sheet drawer with drag handle, constrained to `max-h-[75vh]` with smooth vertical scrolling.
+   - **Floating Mobile Undo / Redo & Zoom Island:** Positioned at `bottom-20 left-3 mb-safe` directly above the mobile toolbar, providing 1-tap Undo, Redo, and Fit-to-Screen controls.
+   - **Compact Header & Slide-Out Menu:** Mobile Navbar collapses board switcher and branding into a compact header with a `MoreVertical` button that reveals a slide-out drawer hosting Export (PNG, SVG, JSON, Project), Import, Clear Canvas, Theme toggle, and Shortcuts.
+
+2. **Touch-First Canvas Engine & Gestures:**
+   - **Multi-Touch Pinch-to-Zoom & Pan:** Native pointer tracking calculates two-finger distance and midpoint dynamically, scaling zoom between 0.1x and 5.0x with sub-pixel canvas offsets.
+   - **Staggered Pinch Cancellation:** Prevents rogue 1-finger strokes or marquee boxes if one finger touches down milliseconds before the second during pinch gestures (`previewElement = null` and `selectionTool.mode = 'idle'` on `activePointers.size === 2`).
+   - **Touch-Aware Resize Handles:** `SelectionManager` automatically applies a generous 16px touch radius for fingertips (vs 8px for precision mouse pointers), scaled by canvas zoom.
+   - **Virtual Keyboard Friendly Text Editing:** Inline text editor overlay renders accessible "Done" (commit) and "Cancel" touch buttons to overcome mobile virtual keyboards lacking physical `Ctrl+Enter` or `Esc` keys.
+
+3. **Safe-Area Insets & 320px Viewport Safety:**
+   - Viewport meta configured with `viewport-fit=cover` and double-tap zoom suppression.
+   - Dedicated Tailwind utilities (`.pb-safe`, `.pt-safe`, `.pl-safe`, `.pr-safe`, `.mb-safe`) dynamically read `env(safe-area-inset-*)`.
+   - All modals (`BoardManagerModal`, `ConfirmModal`, `ShortcutsModal`, Rename/Delete dialogs) enforce `max-w-[calc(100vw-2rem)]`, guaranteeing zero clipping or horizontal scroll on 320px–360px displays.
+
+---
+
 ## 4. Major Bugs Identified and Fixed
 
 ### 4.1 Drawing Engine Fixes
@@ -691,39 +715,40 @@ SketchFlow/
 │   ├── textToolWorkflowAudit.mjs   # 50 tests: Text creation, multiline, persistence, regressions
 │   ├── imageToolAudit.mjs          # 59 tests: Formats, sanitization, IndexedDB, transforms, export
 │   ├── themeAudit.mjs              # 32 tests: Light/Dark/System, persistence, listeners, canvas protection
-│   └── multipleBoardsAudit.mjs     # 83 tests: 24-point audit of creation, isolation, switching, duplicate, delete, image safety, migration, project I/O
+│   ├── multipleBoardsAudit.mjs     # 94 tests: Creation, isolation, switching, duplicate, delete flow, cancellation, image safety, migration, project I/O
+│   └── mobileResponsiveAudit.mjs   # 19 tests: Touch targets, pinch-to-zoom math, handle hit tolerance, responsive layout, 320px safety
 │
 └── src/
     ├── main.jsx                    # React DOM root initialization
     ├── App.jsx                     # Top-level application layout with dark mode background & board init
-    ├── index.css                   # Global Tailwind utilities, CSS variables & themed scrollbars
+    ├── index.css                   # Global Tailwind utilities, CSS variables, safe-area insets & themed scrollbars
     │
     ├── components/
     │   ├── canvas/
-    │   │   ├── Whiteboard.jsx          # Primary canvas, theme-aware background/grid & text overlay
+    │   │   ├── Whiteboard.jsx          # Primary canvas, touch/pointer event handling, pinch-to-zoom, text overlay
     │   │   ├── CanvasRenderer.js       # Pure 2D canvas drawing routines (roughness, shapes, images)
     │   │   ├── DrawingEngine.js        # Dispatches canvas events to active tool classes
-    │   │   └── SelectionManager.js     # 8-point handle hit-testing, cursor styles, and resizing math
+    │   │   └── SelectionManager.js     # Touch-aware 8-point handle hit-testing (16px touch / 8px mouse), resizing math
     │   │
     │   ├── boards/
-    │   │   └── BoardManagerModal.jsx   # Dedicated Whiteboards modal: cards, thumbnails, search, sort, rename, delete
+    │   │   └── BoardManagerModal.jsx   # Dedicated Whiteboards modal: responsive card grid, search, sort, rename, delete
     │   │
     │   ├── layout/
-    │   │   ├── Navbar.jsx              # Header bar: Logo, Board Switcher, Export/Project menu, Import, Clear, Theme, Help
+    │   │   ├── Navbar.jsx              # Responsive header bar: Logo, Board Switcher, slide-out mobile drawer, Export, Import, Clear, Theme
     │   │   ├── ThemeToggle.jsx         # 3-state Theme switcher: Light (Sun), Dark (Moon), System (Monitor)
-    │   │   ├── Toolbar.jsx             # Floating top-center toolbar housing 11 drawing tools
-    │   │   ├── PropertiesPanel.jsx     # Context-sensitive styling controls (Stroke, Fill, Text, Image)
-    │   │   ├── BottomBar.jsx           # Viewport controls: Zoom in/out/reset, Center, Fit, Grid toggle
-    │   │   ├── ShortcutsModal.jsx      # Modal dialog listing complete keyboard shortcut reference
-    │   │   └── ConfirmModal.jsx        # Confirmation dialog before canvas clear
+    │   │   ├── Toolbar.jsx             # Responsive toolbar: floating top on desktop, horizontally scrollable bottom-bar on mobile (44px touch targets)
+    │   │   ├── PropertiesPanel.jsx     # Responsive properties: floating left panel on desktop, floating Style Pill & slide-up drawer on mobile
+    │   │   ├── BottomBar.jsx           # Responsive viewport controls: 3 islands on desktop, floating bottom-left Undo/Redo & Zoom on mobile
+    │   │   ├── ShortcutsModal.jsx      # Modal dialog listing complete keyboard shortcut reference (responsive 320px+)
+    │   │   └── ConfirmModal.jsx        # Confirmation dialog before canvas clear (responsive 320px+)
     │   │
     │   ├── common/
-    │   │   ├── ColorPicker.jsx         # Custom color swatch grid and native color input
-    │   │   ├── IconButton.jsx          # Themed accessible toolbar button with tooltip
-    │   │   └── Tooltip.jsx             # Themed hover tooltip with keyboard shortcut indicator
+    │   │   ├── ColorPicker.jsx         # Custom color swatch grid with enlarged mobile touch targets
+    │   │   ├── IconButton.jsx          # Themed accessible button with min 44x44px touch preset
+    │   │   └── Tooltip.jsx             # Themed hover tooltip suppressed on touch screens
     │   │
     │   └── tools/
-    │       ├── SelectionTool.js        # Single selection, marquee drag, translation, resize dispatch
+    │       ├── SelectionTool.js        # Single selection, marquee drag, translation, touch-aware resize dispatch
     │       ├── RectangleTool.js        # Drag-to-draw rectangle with corner rounding support
     │       ├── CircleTool.js           # Drag-to-draw ellipse and circle geometry
     │       ├── DiamondTool.js          # Decision diamond geometry with 4 vertices
@@ -738,11 +763,18 @@ SketchFlow/
     │   └── themeStore.js               # Centralized Zustand store: Light, Dark, System preference & listener
     │
     ├── hooks/
-    │   └── useKeyboardShortcuts.js     # Global keyboard event listener (V, H, R, O, D, A, L, P, T, 9, E, etc.)
+    │   ├── useKeyboardShortcuts.js     # Global keyboard event listener (V, H, R, O, D, A, L, P, T, 9, E, etc.)
+    │   └── useMediaQuery.js            # Responsive media query hooks (useIsMobile, useIsTablet) with SSR fallbacks
     │
     └── utils/
         ├── canvasUtils.js              # Transforms (screenToCanvas, canvasToScreen), themed grid, measureText
         ├── geometryUtils.js            # Bounding box calculations, distance formulas, resize handle positions
+        ├── hitTestUtils.js             # Exact geometric hit-testing for rectangles, diamonds, circles, lines, images
+        ├── exportUtils.js              # High-DPI PNG, SVG XML, single-board JSON, and .sketchflow-project export/import
+        ├── storageUtils.js             # LocalStorage persistence wrapper with error handling
+        ├── boardStorage.js             # IndexedDB boards database (sketchflow_db v2), migration, and safe orphan cleanup
+        ├── imageStorage.js             # IndexedDB asset database (sketchflow_db) with in-memory caching & cleanup
+        └── imageUtils.js               # Image validation, safe SVG sanitization, aspect ratio scaling, element creation
         ├── hitTestUtils.js             # Exact geometric hit-testing for rectangles, diamonds, circles, lines, images
         ├── exportUtils.js              # High-DPI PNG, SVG XML, single-board JSON, and .sketchflow-project export/import
         ├── storageUtils.js             # LocalStorage persistence wrapper with error handling
@@ -768,7 +800,8 @@ The project includes seven automated test suites run directly via `npm test`:
 | **Image Tool Audit** | `tests/imageToolAudit.mjs` | 59 | 59 Passed | Format validation (PNG, JPG, WebP, SVG), SVG security sanitization (stripping scripts & handlers), 25MB limit, IndexedDB storage, 8-handle resizing with aspect ratio lock, rotation, opacity, multi-selection, undo/redo, 50%–200% zoom, and portable export/import. |
 | **Theme System Audit** | `tests/themeAudit.mjs` | 32 | 32 Passed | Light/Dark/System theme resolution, LocalStorage persistence, DOM attribute synchronization, dynamic OS preference change listener, zero element color mutation, undo/redo history isolation, export invariance, and theme-adaptive grid rendering. |
 | **Multiple Boards Audit** | `tests/multipleBoardsAudit.mjs` | 94 | 94 Passed | Creation, unique IDs, data independence, switching lifecycle, refresh persistence, rename validation, duplicate deep-clone, delete inactive/active/last, cancellation handling, deletion error handling, image asset safety, orphan cleanup, legacy migration, migration idempotency, undo/redo isolation, viewport isolation, rapid switching race conditions, project export/import, single-board compatibility, Light & Dark modes, search & sorting. |
-| **Total** | | **309** | **309 Passed (0 Failed)** | **100% Automated Test Pass Rate** |
+| **Mobile Responsive Audit** | `tests/mobileResponsiveAudit.mjs` | 19 | 19 Passed | Touch target sizing (min 44x44px), all 11 drawing tools on mobile toolbar, color swatch sizing, tooltip hover suppression, touch-aware resize handles (16px touch vs 8px mouse tolerance), pinch-to-zoom distance & midpoint math, 2-finger stroke cancellation, mobile layout transformations (Navbar drawer, bottom sheet properties, bottom-bar floating controls), and 320px viewport safety. |
+| **Total** | | **328** | **328 Passed (0 Failed)** | **100% Automated Test Pass Rate** |
 
 ### 6.2 Board Deletion Flow & IndexedDB Persistence Fix (v1.3.1 Audit)
 

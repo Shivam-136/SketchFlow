@@ -15,11 +15,12 @@ export class SelectionManager {
   }
 
   /**
-   * Check if mouse is hovering over one of the 8 resize handles
+   * Check if mouse or touch is interacting with one of the 8 resize handles
    */
-  getHandle(point, bounds, zoom) {
+  getHandle(point, bounds, zoom, isTouch = false) {
     if (!bounds || (bounds.width <= 0 && bounds.height <= 0)) return null;
-    return getHandleUnderCursor(point.x, point.y, bounds, 8, zoom);
+    const radius = isTouch ? 16 : 8;
+    return getHandleUnderCursor(point.x, point.y, bounds, radius, zoom);
   }
 
   /**

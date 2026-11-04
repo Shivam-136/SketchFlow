@@ -52,20 +52,20 @@ export function ShortcutsModal() {
   if (!show) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/40 dark:bg-black/60 backdrop-blur-sm animate-in fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-zinc-900/40 dark:bg-black/60 backdrop-blur-sm animate-in fade-in">
       <div
         className="fixed inset-0"
         onClick={() => setShow(false)}
       />
-      <div className="relative w-full max-w-2xl bg-white dark:bg-zinc-900 rounded-2xl shadow-sketch-lg border border-zinc-200 dark:border-zinc-800 p-6 z-10 max-h-[85vh] flex flex-col animate-in zoom-in-95 text-zinc-800 dark:text-zinc-100 transition-colors duration-200">
-        <div className="flex items-center justify-between pb-4 border-b border-zinc-100 dark:border-zinc-800">
+      <div className="relative w-full max-w-[calc(100vw-2rem)] sm:max-w-2xl bg-white dark:bg-zinc-900 rounded-2xl shadow-sketch-lg border border-zinc-200 dark:border-zinc-800 p-4 sm:p-6 z-10 max-h-[85vh] flex flex-col animate-in zoom-in-95 text-zinc-800 dark:text-zinc-100 transition-colors duration-200">
+        <div className="flex items-center justify-between pb-3 sm:pb-4 border-b border-zinc-100 dark:border-zinc-800">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
               <Sparkles className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100">Keyboard Shortcuts</h2>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">Quickly navigate and draw using standard key commands</p>
+              <h2 className="text-sm sm:text-base font-bold text-zinc-900 dark:text-zinc-100">Keyboard Shortcuts</h2>
+              <p className="text-[11px] sm:text-xs text-zinc-500 dark:text-zinc-400 hidden xs:block sm:block">Quickly navigate and draw using standard key commands</p>
             </div>
           </div>
           <button
@@ -77,7 +77,7 @@ export function ShortcutsModal() {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 py-4 overflow-y-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 py-4 overflow-y-auto">
           {SHORTCUT_GROUPS.map((group) => (
             <div key={group.category} className="flex flex-col gap-2.5">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">

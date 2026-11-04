@@ -16,7 +16,8 @@ export function IconButton({
     sm: 'w-8 h-8 p-1.5',
     md: 'w-9 h-9 p-2',
     lg: 'w-10 h-10 p-2.5',
-  }[size];
+    touch: 'w-11 h-11 min-w-[44px] min-h-[44px] p-2.5',
+  }[size] || 'w-9 h-9 p-2';
 
   const buttonContent = (
     <button

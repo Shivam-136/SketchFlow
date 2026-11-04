@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Layers,
   Copy,
@@ -16,13 +16,18 @@ import {
   RotateCcw,
   Lock,
   Unlock,
-  Image as ImageIcon
+  Image as ImageIcon,
+  X
 } from 'lucide-react';
 import { useCanvasStore } from '../../store/canvasStore';
+import { useIsMobile } from '../../hooks/useMediaQuery';
 import { ColorPicker } from '../common/ColorPicker';
 import { Tooltip } from '../common/Tooltip';
 
 export function PropertiesPanel() {
+  const isMobile = useIsMobile();
+  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
+
   const activeTool = useCanvasStore((s) => s.activeTool);
   const selectedIds = useCanvasStore((s) => s.selectedIds);
   const elements = useCanvasStore((s) => s.elements);
@@ -56,27 +61,20 @@ export function PropertiesPanel() {
     return null;
   }
 
-  return (
-    <aside
-      aria-label="Shape Properties Panel"
-      className="fixed left-4 top-20 z-30 w-64 max-h-[calc(100vh-160px)] overflow-y-auto bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md rounded-2xl shadow-sketch border border-zinc-200/80 dark:border-zinc-800 p-3.5 flex flex-col gap-4 text-xs select-none text-zinc-800 dark:text-zinc-100 transition-colors duration-200"
-    >
-      {/* Header info */}
-      <div className="flex items-center justify-between pb-1 border-b border-zinc-100 dark:border-zinc-800">
-        <span className="font-semibold text-zinc-800 dark:text-zinc-100 text-[11px] uppercase tracking-wider flex items-center gap-1.5">
-          {isOnlyImage ? (
-            <ImageIcon className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-          ) : (
-            <Sliders className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-          )}
-          {hasSelection
-            ? isOnlyImage
-              ? 'Image Properties'
-              : `${selectedElements.length} Selected`
-            : `${activeTool.charAt(0).toUpperCase() + activeTool.slice(1)} Style`}
-        </span>
-      </div>
+  const headerTitle = hasSelection
+    ? isOnlyImage
+      ? 'Image Properties'
+      : `${selectedElements.length} Selected`
+    : `${activeTool.charAt(0).toUpperCase() + activeTool.slice(1)} Style`;
 
+  const headerIcon = isOnlyImage ? (
+    <ImageIcon className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+  ) : (
+    <Sliders className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+  );
+
+  const renderPropertiesContent = () => (
+    <>
       {/* Image Properties */}
       {isOnlyImage && selectedImage && (
         <div className="flex flex-col gap-3">
@@ -217,249 +215,249 @@ export function PropertiesPanel() {
             onChange={(color) => updateToolProperties({ strokeColor: color })}
           />
 
-      {/* Background / Fill Color (for shapes) */}
-      {!isLineOrArrow && !isPencilMode && !isTextMode && (
-        <ColorPicker
-          label="Background Fill"
-          value={toolProperties.backgroundColor}
-          onChange={(color) => updateToolProperties({ backgroundColor: color })}
-          allowTransparent
-        />
-      )}
+          {/* Background / Fill Color (for shapes) */}
+          {!isLineOrArrow && !isPencilMode && !isTextMode && (
+            <ColorPicker
+              label="Background Fill"
+              value={toolProperties.backgroundColor}
+              onChange={(color) => updateToolProperties({ backgroundColor: color })}
+              allowTransparent
+            />
+          )}
 
-      {/* Fill Style: None, Solid, Semi, Hachure */}
-      {isShapeMode && toolProperties.backgroundColor !== 'transparent' && (
-        <div className="flex flex-col gap-1.5">
-          <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Fill Style</span>
-          <div className="grid grid-cols-4 gap-1 p-1 bg-zinc-100/80 dark:bg-zinc-800/80 rounded-xl">
-            {[
-              { id: 'none', label: 'None' },
-              { id: 'semi', label: 'Semi' },
-              { id: 'solid', label: 'Solid' },
-              { id: 'hachure', label: 'Hachure' }
-            ].map((style) => (
-              <button
-                key={style.id}
-                type="button"
-                onClick={() => updateToolProperties({ fillStyle: style.id })}
-                className={`
-                  py-1 text-[11px] rounded-lg font-medium transition-all
-                  ${toolProperties.fillStyle === style.id
-                    ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm'
-                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'}
-                `}
-              >
-                {style.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Stroke Width */}
-      {!isTextMode && (
-        <div className="flex flex-col gap-1.5">
-          <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Stroke Width</span>
-          <div className="grid grid-cols-4 gap-1.5">
-            {[
-              { width: 1, label: 'Thin' },
-              { width: 2, label: 'Regular' },
-              { width: 4, label: 'Bold' },
-              { width: 6, label: 'Extra' }
-            ].map((item) => (
-              <button
-                key={item.width}
-                type="button"
-                onClick={() => updateToolProperties({ strokeWidth: item.width })}
-                className={`
-                  flex items-center justify-center h-8 rounded-lg border transition-all
-                  ${toolProperties.strokeWidth === item.width
-                    ? 'bg-indigo-50 dark:bg-indigo-950/70 border-indigo-400 dark:border-indigo-600 text-indigo-700 dark:text-indigo-300'
-                    : 'border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-750 text-zinc-600 dark:text-zinc-400'}
-                `}
-                title={item.label}
-              >
-                <div
-                  className="w-4 bg-current rounded-full"
-                  style={{ height: item.width }}
-                />
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Stroke Style: Solid, Dashed, Dotted */}
-      {!isTextMode && (
-        <div className="flex flex-col gap-1.5">
-          <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Stroke Style</span>
-          <div className="grid grid-cols-3 gap-1 p-1 bg-zinc-100/80 dark:bg-zinc-800/80 rounded-xl">
-            {[
-              { id: 'solid', label: 'Solid' },
-              { id: 'dashed', label: 'Dashed' },
-              { id: 'dotted', label: 'Dotted' }
-            ].map((style) => (
-              <button
-                key={style.id}
-                type="button"
-                onClick={() => updateToolProperties({ strokeStyle: style.id })}
-                className={`
-                  py-1 text-[11px] rounded-lg font-medium transition-all
-                  ${toolProperties.strokeStyle === style.id
-                    ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm'
-                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'}
-                `}
-              >
-                {style.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Sloppiness / Roughness */}
-      {!isTextMode && (
-        <div className="flex flex-col gap-1.5">
-          <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider flex items-center justify-between">
-            <span>Roughness / Style</span>
-            <Sparkles className="w-3 h-3 text-amber-500" />
-          </span>
-          <div className="grid grid-cols-3 gap-1 p-1 bg-zinc-100/80 dark:bg-zinc-800/80 rounded-xl">
-            {[
-              { val: 0, label: 'Architect' },
-              { val: 1, label: 'Artist' },
-              { val: 2, label: 'Cartoonist' }
-            ].map((r) => (
-              <button
-                key={r.val}
-                type="button"
-                onClick={() => updateToolProperties({ roughness: r.val })}
-                className={`
-                  py-1 text-[11px] rounded-lg font-medium transition-all
-                  ${toolProperties.roughness === r.val
-                    ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm'
-                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'}
-                `}
-              >
-                {r.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Corners: Sharp vs Rounded (for rectangles) */}
-      {(activeTool === 'rectangle' || (hasSelection && selectedElements.some((e) => e.type === 'rectangle'))) && (
-        <div className="flex flex-col gap-1.5">
-          <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Corners</span>
-          <div className="grid grid-cols-2 gap-1 p-1 bg-zinc-100/80 dark:bg-zinc-800/80 rounded-xl">
-            {[
-              { id: 'sharp', label: 'Sharp' },
-              { id: 'round', label: 'Rounded' }
-            ].map((edge) => (
-              <button
-                key={edge.id}
-                type="button"
-                onClick={() => updateToolProperties({ edgeStyle: edge.id })}
-                className={`
-                  py-1 text-[11px] rounded-lg font-medium transition-all
-                  ${toolProperties.edgeStyle === edge.id
-                    ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm'
-                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'}
-                `}
-              >
-                {edge.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Text Options */}
-      {isTextMode && (
-        <>
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Font Family</span>
-            <div className="grid grid-cols-3 gap-1 p-1 bg-zinc-100/80 dark:bg-zinc-800/80 rounded-xl">
-              {[
-                { id: 'Caveat, cursive', label: 'Handwritten' },
-                { id: 'Inter, sans-serif', label: 'Normal' },
-                { id: 'JetBrains Mono, monospace', label: 'Code' }
-              ].map((font) => (
-                <button
-                  key={font.id}
-                  type="button"
-                  onClick={() => updateToolProperties({ fontFamily: font.id })}
-                  className={`
-                    py-1 text-[11px] rounded-lg font-medium transition-all truncate px-1
-                    ${toolProperties.fontFamily === font.id
-                      ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm'
-                      : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'}
-                  `}
-                >
-                  {font.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Font Size</span>
-            <div className="grid grid-cols-4 gap-1 p-1 bg-zinc-100/80 dark:bg-zinc-800/80 rounded-xl">
-              {[
-                { size: 16, label: 'S' },
-                { size: 24, label: 'M' },
-                { size: 36, label: 'L' },
-                { size: 48, label: 'XL' }
-              ].map((s) => (
-                <button
-                  key={s.size}
-                  type="button"
-                  onClick={() => updateToolProperties({ fontSize: s.size })}
-                  className={`
-                    py-1 text-[11px] rounded-lg font-medium transition-all
-                    ${toolProperties.fontSize === s.size
-                      ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm'
-                      : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'}
-                  `}
-                >
-                  {s.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Text Alignment</span>
-            <div className="grid grid-cols-3 gap-1 p-1 bg-zinc-100/80 dark:bg-zinc-800/80 rounded-xl">
-              {[
-                { id: 'left', icon: AlignLeft },
-                { id: 'center', icon: AlignCenter },
-                { id: 'right', icon: AlignRight }
-              ].map((al) => {
-                const Icon = al.icon;
-                return (
+          {/* Fill Style: None, Solid, Semi, Hachure */}
+          {isShapeMode && toolProperties.backgroundColor !== 'transparent' && (
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Fill Style</span>
+              <div className="grid grid-cols-4 gap-1 p-1 bg-zinc-100/80 dark:bg-zinc-800/80 rounded-xl">
+                {[
+                  { id: 'none', label: 'None' },
+                  { id: 'semi', label: 'Semi' },
+                  { id: 'solid', label: 'Solid' },
+                  { id: 'hachure', label: 'Hachure' }
+                ].map((style) => (
                   <button
-                    key={al.id}
+                    key={style.id}
                     type="button"
-                    onClick={() => updateToolProperties({ textAlign: al.id })}
+                    onClick={() => updateToolProperties({ fillStyle: style.id })}
                     className={`
-                      py-1 flex items-center justify-center rounded-lg transition-all
-                      ${toolProperties.textAlign === al.id
+                      py-1 text-[11px] rounded-lg font-medium transition-all
+                      ${toolProperties.fillStyle === style.id
                         ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm'
                         : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'}
                     `}
                   >
-                    <Icon className="w-3.5 h-3.5" />
+                    {style.label}
                   </button>
-                );
-              })}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Stroke Width */}
+          {!isTextMode && (
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Stroke Width</span>
+              <div className="grid grid-cols-4 gap-1.5">
+                {[
+                  { width: 1, label: 'Thin' },
+                  { width: 2, label: 'Regular' },
+                  { width: 4, label: 'Bold' },
+                  { width: 6, label: 'Extra' }
+                ].map((item) => (
+                  <button
+                    key={item.width}
+                    type="button"
+                    onClick={() => updateToolProperties({ strokeWidth: item.width })}
+                    className={`
+                      flex items-center justify-center h-8 rounded-lg border transition-all
+                      ${toolProperties.strokeWidth === item.width
+                        ? 'bg-indigo-50 dark:bg-indigo-950/70 border-indigo-400 dark:border-indigo-600 text-indigo-700 dark:text-indigo-300'
+                        : 'border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-750 text-zinc-600 dark:text-zinc-400'}
+                    `}
+                    title={item.label}
+                  >
+                    <div
+                      className="w-4 bg-current rounded-full"
+                      style={{ height: item.width }}
+                    />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Stroke Style: Solid, Dashed, Dotted */}
+          {!isTextMode && (
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Stroke Style</span>
+              <div className="grid grid-cols-3 gap-1 p-1 bg-zinc-100/80 dark:bg-zinc-800/80 rounded-xl">
+                {[
+                  { id: 'solid', label: 'Solid' },
+                  { id: 'dashed', label: 'Dashed' },
+                  { id: 'dotted', label: 'Dotted' }
+                ].map((style) => (
+                  <button
+                    key={style.id}
+                    type="button"
+                    onClick={() => updateToolProperties({ strokeStyle: style.id })}
+                    className={`
+                      py-1 text-[11px] rounded-lg font-medium transition-all
+                      ${toolProperties.strokeStyle === style.id
+                        ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm'
+                        : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'}
+                    `}
+                  >
+                    {style.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Sloppiness / Roughness */}
+          {!isTextMode && (
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider flex items-center justify-between">
+                <span>Roughness / Style</span>
+                <Sparkles className="w-3 h-3 text-amber-500" />
+              </span>
+              <div className="grid grid-cols-3 gap-1 p-1 bg-zinc-100/80 dark:bg-zinc-800/80 rounded-xl">
+                {[
+                  { val: 0, label: 'Architect' },
+                  { val: 1, label: 'Artist' },
+                  { val: 2, label: 'Cartoonist' }
+                ].map((r) => (
+                  <button
+                    key={r.val}
+                    type="button"
+                    onClick={() => updateToolProperties({ roughness: r.val })}
+                    className={`
+                      py-1 text-[11px] rounded-lg font-medium transition-all
+                      ${toolProperties.roughness === r.val
+                        ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm'
+                        : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'}
+                    `}
+                  >
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Corners: Sharp vs Rounded (for rectangles) */}
+          {(activeTool === 'rectangle' || (hasSelection && selectedElements.some((e) => e.type === 'rectangle'))) && (
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Corners</span>
+              <div className="grid grid-cols-2 gap-1 p-1 bg-zinc-100/80 dark:bg-zinc-800/80 rounded-xl">
+                {[
+                  { id: 'sharp', label: 'Sharp' },
+                  { id: 'round', label: 'Rounded' }
+                ].map((edge) => (
+                  <button
+                    key={edge.id}
+                    type="button"
+                    onClick={() => updateToolProperties({ edgeStyle: edge.id })}
+                    className={`
+                      py-1 text-[11px] rounded-lg font-medium transition-all
+                      ${toolProperties.edgeStyle === edge.id
+                        ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm'
+                        : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'}
+                    `}
+                  >
+                    {edge.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Text Options */}
+          {isTextMode && (
+            <>
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Font Family</span>
+                <div className="grid grid-cols-3 gap-1 p-1 bg-zinc-100/80 dark:bg-zinc-800/80 rounded-xl">
+                  {[
+                    { id: 'Caveat, cursive', label: 'Handwritten' },
+                    { id: 'Inter, sans-serif', label: 'Normal' },
+                    { id: 'JetBrains Mono, monospace', label: 'Code' }
+                  ].map((font) => (
+                    <button
+                      key={font.id}
+                      type="button"
+                      onClick={() => updateToolProperties({ fontFamily: font.id })}
+                      className={`
+                        py-1 text-[11px] rounded-lg font-medium transition-all truncate px-1
+                        ${toolProperties.fontFamily === font.id
+                          ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm'
+                          : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'}
+                      `}
+                    >
+                      {font.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Font Size</span>
+                <div className="grid grid-cols-4 gap-1 p-1 bg-zinc-100/80 dark:bg-zinc-800/80 rounded-xl">
+                  {[
+                    { size: 16, label: 'S' },
+                    { size: 24, label: 'M' },
+                    { size: 36, label: 'L' },
+                    { size: 48, label: 'XL' }
+                  ].map((s) => (
+                    <button
+                      key={s.size}
+                      type="button"
+                      onClick={() => updateToolProperties({ fontSize: s.size })}
+                      className={`
+                        py-1 text-[11px] rounded-lg font-medium transition-all
+                        ${toolProperties.fontSize === s.size
+                          ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm'
+                          : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'}
+                      `}
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Text Alignment</span>
+                <div className="grid grid-cols-3 gap-1 p-1 bg-zinc-100/80 dark:bg-zinc-800/80 rounded-xl">
+                  {[
+                    { id: 'left', icon: AlignLeft },
+                    { id: 'center', icon: AlignCenter },
+                    { id: 'right', icon: AlignRight }
+                  ].map((al) => {
+                    const Icon = al.icon;
+                    return (
+                      <button
+                        key={al.id}
+                        type="button"
+                        onClick={() => updateToolProperties({ textAlign: al.id })}
+                        className={`
+                          py-1 flex items-center justify-center rounded-lg transition-all
+                          ${toolProperties.textAlign === al.id
+                            ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm'
+                            : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'}
+                        `}
+                      >
+                        <Icon className="w-3.5 h-3.5" />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          )}
         </>
       )}
-      </>
-    )}
 
       {/* Opacity slider */}
       <div className="flex flex-col gap-1.5">
@@ -478,7 +476,7 @@ export function PropertiesPanel() {
             const { elements, pushHistory } = useCanvasStore.getState();
             pushHistory(elements);
           }}
-          className="w-full accent-indigo-600 dark:accent-indigo-500 cursor-pointer h-1.5 bg-zinc-200 dark:bg-zinc-700 rounded-lg appearance-none"
+          className="w-full accent-indigo-600 dark:accent-indigo-500 cursor-pointer h-2 bg-zinc-200 dark:bg-zinc-700 rounded-lg appearance-none"
         />
       </div>
 
@@ -500,7 +498,7 @@ export function PropertiesPanel() {
                 type="button"
                 onClick={() => alignSelected(al.id)}
                 title={`Align ${al.label}`}
-                className="h-7 text-xs flex items-center justify-center font-mono rounded bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300"
+                className="h-8 text-xs flex items-center justify-center font-mono rounded-lg bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 active:scale-95 transition-all"
               >
                 {al.icon}
               </button>
@@ -518,15 +516,15 @@ export function PropertiesPanel() {
               type="button"
               onClick={bringToFront}
               title="Bring to Front"
-              className="p-1.5 flex items-center justify-center rounded-lg border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300"
+              className="p-2 flex items-center justify-center rounded-lg border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 active:scale-95"
             >
-              <BringToFront className="w-3.5 h-3.5" />
+              <BringToFront className="w-4 h-4" />
             </button>
             <button
               type="button"
               onClick={bringForward}
               title="Bring Forward"
-              className="p-1.5 text-xs font-semibold rounded-lg border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 flex items-center justify-center"
+              className="p-2 text-xs font-semibold rounded-lg border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 flex items-center justify-center active:scale-95"
             >
               +1
             </button>
@@ -534,7 +532,7 @@ export function PropertiesPanel() {
               type="button"
               onClick={sendBackward}
               title="Send Backward"
-              className="p-1.5 text-xs font-semibold rounded-lg border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 flex items-center justify-center"
+              className="p-2 text-xs font-semibold rounded-lg border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 flex items-center justify-center active:scale-95"
             >
               -1
             </button>
@@ -542,26 +540,29 @@ export function PropertiesPanel() {
               type="button"
               onClick={sendToBack}
               title="Send to Back"
-              className="p-1.5 flex items-center justify-center rounded-lg border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300"
+              className="p-2 flex items-center justify-center rounded-lg border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 active:scale-95"
             >
-              <SendToBack className="w-3.5 h-3.5" />
+              <SendToBack className="w-4 h-4" />
             </button>
           </div>
 
           {/* Duplicate & Delete */}
-          <div className="grid grid-cols-2 gap-1.5 mt-1">
+          <div className="grid grid-cols-2 gap-2 mt-1">
             <button
               type="button"
               onClick={duplicateSelected}
-              className="flex items-center justify-center gap-1.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-medium"
+              className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-medium active:scale-95"
             >
               <Copy className="w-3.5 h-3.5" />
               <span>Duplicate</span>
             </button>
             <button
               type="button"
-              onClick={deleteSelected}
-              className="flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-400 text-xs font-medium"
+              onClick={() => {
+                deleteSelected();
+                if (isMobile) setIsMobileDrawerOpen(false);
+              }}
+              className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-400 text-xs font-semibold active:scale-95"
             >
               <Trash2 className="w-3.5 h-3.5" />
               <span>Delete</span>
@@ -569,6 +570,88 @@ export function PropertiesPanel() {
           </div>
         </div>
       )}
-    </aside>
+    </>
+  );
+
+  // Desktop Rendering
+  if (!isMobile) {
+    return (
+      <aside
+        aria-label="Shape Properties Panel"
+        className="fixed left-4 top-20 z-30 w-64 max-h-[calc(100vh-160px)] overflow-y-auto bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md rounded-2xl shadow-sketch border border-zinc-200/80 dark:border-zinc-800 p-3.5 flex flex-col gap-4 text-xs select-none text-zinc-800 dark:text-zinc-100 transition-colors duration-200"
+      >
+        {/* Header info */}
+        <div className="flex items-center justify-between pb-1 border-b border-zinc-100 dark:border-zinc-800">
+          <span className="font-semibold text-zinc-800 dark:text-zinc-100 text-[11px] uppercase tracking-wider flex items-center gap-1.5">
+            {headerIcon}
+            {headerTitle}
+          </span>
+        </div>
+        {renderPropertiesContent()}
+      </aside>
+    );
+  }
+
+  // Mobile Rendering: Bottom Sheet Drawer
+  return (
+    <>
+      {/* Floating Style Pill Trigger (placed cleanly above bottom toolbar on the right) */}
+      <div className="fixed bottom-20 right-3 z-30 pointer-events-auto mb-safe">
+        <button
+          type="button"
+          onClick={() => setIsMobileDrawerOpen(!isMobileDrawerOpen)}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-2xl bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md shadow-sketch-lg border border-zinc-200/90 dark:border-zinc-800 text-xs font-semibold text-zinc-800 dark:text-zinc-100 active:scale-95 transition-all"
+          aria-label="Open style properties drawer"
+        >
+          <Sliders className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+          <span>Style</span>
+          <span
+            className="w-2.5 h-2.5 rounded-full border border-black/10 shadow-2xs flex-shrink-0"
+            style={{ backgroundColor: toolProperties.strokeColor || '#1e1e1e' }}
+          />
+        </button>
+      </div>
+
+      {/* Mobile Slide-up Bottom Sheet */}
+      {isMobileDrawerOpen && (
+        <div className="fixed inset-0 z-50 pointer-events-auto">
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-zinc-900/40 dark:bg-black/60 backdrop-blur-xs animate-in fade-in"
+            onClick={() => setIsMobileDrawerOpen(false)}
+          />
+
+          {/* Bottom Sheet Drawer */}
+          <div className="fixed inset-x-0 bottom-0 z-50 bg-white dark:bg-zinc-900 rounded-t-3xl shadow-sketch-lg border-t border-zinc-200 dark:border-zinc-800 max-h-[75vh] flex flex-col animate-in slide-in-from-bottom duration-200 pb-safe text-zinc-800 dark:text-zinc-100">
+            {/* Drag Handle */}
+            <div
+              className="w-12 h-1.5 rounded-full bg-zinc-300 dark:bg-zinc-700 mx-auto my-2.5 cursor-grab active:cursor-grabbing"
+              onClick={() => setIsMobileDrawerOpen(false)}
+            />
+
+            {/* Drawer Header */}
+            <div className="flex items-center justify-between px-5 pb-3 border-b border-zinc-100 dark:border-zinc-800 flex-shrink-0">
+              <span className="font-bold text-sm text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                {headerIcon}
+                <span>{headerTitle}</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsMobileDrawerOpen(false)}
+                className="p-1.5 rounded-xl text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                aria-label="Close properties drawer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Drawer Body */}
+            <div className="overflow-y-auto px-5 py-4 flex flex-col gap-4 text-xs">
+              {renderPropertiesContent()}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
