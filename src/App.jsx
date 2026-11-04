@@ -1,16 +1,23 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Navbar } from './components/layout/Navbar';
 import { Toolbar } from './components/layout/Toolbar';
 import { PropertiesPanel } from './components/layout/PropertiesPanel';
 import { BottomBar } from './components/layout/BottomBar';
 import { ShortcutsModal } from './components/layout/ShortcutsModal';
 import { ConfirmModal } from './components/layout/ConfirmModal';
+import { BoardManagerModal } from './components/boards/BoardManagerModal';
 import { Whiteboard } from './components/canvas/Whiteboard';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+import { useCanvasStore } from './store/canvasStore';
 
 export default function App() {
   // Initialize global keyboard shortcuts (V, H, R, O, D, A, L, P, T, E, Ctrl+Z, Ctrl+C, etc.)
   useKeyboardShortcuts();
+
+  // Initialize Multiple Boards system on startup
+  useEffect(() => {
+    useCanvasStore.getState().initBoards();
+  }, []);
 
   const containerRef = useRef(null);
 
@@ -36,6 +43,7 @@ export default function App() {
       {/* Modals */}
       <ShortcutsModal />
       <ConfirmModal />
+      <BoardManagerModal />
     </div>
   );
 }

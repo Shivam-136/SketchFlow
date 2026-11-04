@@ -1,6 +1,6 @@
 # SketchFlow — Project Documentation & Engineering Progress
 
-**Document Version:** 1.2.0  
+**Document Version:** 1.3.0  
 **Last Updated:** November 2026  
 **Project Name:** SketchFlow  
 **Project Type:** Excalidraw-inspired Online Whiteboard Application  
@@ -408,6 +408,106 @@ An inline, synchronous script in `<head>` of `index.html` inspects `sketchflow_t
 - **Undo / Redo Isolation:** Theme switching does not pollute or mutate canvas undo/redo history stacks.
 - **Export Fidelity:** Exported PNG, SVG, and JSON files retain the user's authentic drawing elements, colors, and asset embeddings without theme interference.
 
+### 3.11 Multiple Boards Management System
+
+SketchFlow includes an enterprise-grade, client-side Multiple Boards Management System that enables users to create, organize, switch between, duplicate, rename, and delete multiple independent whiteboards within a single browser session.
+
+#### Architecture & Isolation Principles
+- **100% Frontend & Client-Side:** Operates completely without backend APIs, cloud databases, or authentication servers.
+- **Strict Board Isolation:** Each whiteboard maintains completely independent data:
+  - Vector shapes and freehand pencil strokes
+  - Text elements and image elements
+  - Element coordinates, layers, colors, and roughness settings
+  - Canvas viewport state (pan offset `panX`, `panY` and zoom factor `zoom`)
+  - Grid mode preferences (`dots`, `lines`, `none`)
+  - Undo/redo history stacks (per-board session stacks preventing cross-board history pollution)
+- **Zero Drawing Bleed:** Switching whiteboards instantly flushes the active board's pending changes, clears current selection, restores target board state with deep clones, and updates the canvas without visual flash or stale element retention.
+
+#### IndexedDB & LocalStorage Hybrid Schema
+SketchFlow uses a dual-tier persistence architecture in IndexedDB (`sketchflow_db` v2) and LocalStorage:
+
+1. **IndexedDB (`sketchflow_db`):**
+   - **`boards` Object Store (keyPath: `id`):** Stores complete board records:
+     ```javascript
+     {
+       id: "board_m5x7z1_8f92a",        // Unique collision-resistant board ID
+       name: "System Architecture",     // Human-readable board title
+       createdAt: 1730700000000,        // Timestamp of creation
+       updatedAt: 1730700050000,        // Timestamp of last modification
+       elements: [ ... ],               // Independent array of canvas elements
+       viewport: {
+         zoom: 1.25,
+         panX: 150,
+         panY: 80
+       },
+       gridSettings: {
+         gridType: "dots"
+       },
+       thumbnail: "data:image/png;...", // Auto-generated visual preview
+       metadata: {
+         elementCount: 18
+       }
+     }
+     ```
+   - **`image_assets` Object Store (keyPath: `fileId`):** Stores high-resolution binary image blobs and base64 strings.
+2. **LocalStorage:**
+   - **`sketchflow_active_board_id`:** Tracks active board ID across page reloads and browser sessions.
+   - **`sketchflow_migration_v2_done`:** Idempotency guard flag ensuring legacy single-board migration executes exactly once.
+   - **`sketchflow_canvas_data_v1`:** Mirrored active board data for seamless backward compatibility with legacy tools.
+
+#### Board Switching Lifecycle
+When switching between boards:
+1. **Immediate Flush:** Cancels any active debounce timers and synchronously persists the outgoing board to IndexedDB and LocalStorage (`flushSaveCurrentBoard`).
+2. **History Caching:** Saves the outgoing board's `history` and `historyIndex` into an in-memory session cache (`boardHistoryCache`).
+3. **Target Load:** Fetches the incoming board from IndexedDB or memory cache.
+4. **Deep Clone:** Performs a deep clone of the elements array to prevent shared references between boards.
+5. **Asset Preloading:** Asynchronously preloads any image assets referenced on the target board via `loadImageAsset(fileId)`.
+6. **State Restoration:** Synchronously updates `useCanvasStore`:
+   - `elements`: Cloned target elements
+   - `panOffset`: Target `panX`, `panY`
+   - `zoom`: Target `zoom`
+   - `gridType`: Target `gridType`
+   - `selectedIds`: Cleared to `[]`
+   - `history` & `historyIndex`: Restored from `boardHistoryCache` (or initialized with snapshot)
+   - `activeBoardId` & `activeBoardName`: Updated
+7. **Active Board Tracking:** Persists new active board ID to `localStorage.getItem('sketchflow_active_board_id')`.
+
+#### Safe Image Asset Reference Management
+- Multiple boards can safely reference the same image file ID (`fileId`), such as when duplicating a board.
+- Deleting an element or deleting a board performs safe reference validation across **all remaining boards** in IndexedDB (`getAllReferencedFileIds`).
+- Orphan image cleanup (`cleanupOrphanImages`) purges an image asset from storage **only if zero remaining boards** reference its `fileId`, preventing broken image icons or data loss.
+
+#### Backward-Compatible Legacy Migration
+- On initial launch after upgrading to version 1.3.0, `migrateLegacyBoard()` detects existing legacy drawings in `sketchflow_canvas_data_v1`.
+- If legacy drawing elements exist, they are automatically migrated into a new default board ("My Whiteboard") in IndexedDB with exact element geometry, viewport coordinates, and grid mode.
+- Migration is **100% idempotent**: subsequent launches, reloads, or function invocations check `sketchflow_migration_v2_done` and never duplicate boards.
+- Legacy storage keys are preserved during and after migration for zero data loss.
+
+#### Multi-Board Project Export & Import
+- **`.sketchflow-project` Export:** Serializes project metadata, all boards in IndexedDB, and all bundled image assets (as base64) into a single portable JSON file.
+- **Project Import:** Validates file structure, restores image assets into IndexedDB, resolves board ID collisions safely by generating unique IDs, and switches to the imported active board.
+- **Backward Compatibility:** Single-board `.sketchflow` files continue to export and import without disruption.
+
+#### Board Management Interface (`BoardManagerModal.jsx`)
+- Professional modal accessible from Navbar via the active board switcher pill.
+- Responsive card grid displaying:
+  - Board name with inline rename modal
+  - Auto-generated visual thumbnail preview (with fallback for empty canvases)
+  - Element count badge
+  - Relative modified time ("Updated 2m ago") and created date
+  - Active board indicator badge with pulse animation
+  - Three-dot actions menu (Open, Rename, Duplicate, Delete)
+- Search filter: Real-time substring filter on board names.
+- Multi-criteria sorting:
+  - Recently Modified (default)
+  - Creation Date (Newest first)
+  - Creation Date (Oldest first)
+  - Name (A – Z)
+  - Name (Z – A)
+  - Most Elements
+- Safe board deletion with confirmation modal displaying board name; automatically falls back to an available board or creates a clean default board if the last board is deleted.
+- Real-time auto-save indicator in Navbar: "Saving..." with spinner, "Auto-saved locally" with checkmark, or "Save failed" with alert badge.
+
 ---
 
 ## 4. Major Bugs Identified and Fixed
@@ -581,11 +681,12 @@ SketchFlow/
 │   ├── regressionFlowAudit.mjs     # 30 tests: Combinations, multi-zoom math, stress tests
 │   ├── textToolWorkflowAudit.mjs   # 50 tests: Text creation, multiline, persistence, regressions
 │   ├── imageToolAudit.mjs          # 59 tests: Formats, sanitization, IndexedDB, transforms, export
-│   └── themeAudit.mjs              # 32 tests: Light/Dark/System, persistence, listeners, canvas protection
+│   ├── themeAudit.mjs              # 32 tests: Light/Dark/System, persistence, listeners, canvas protection
+│   └── multipleBoardsAudit.mjs     # 83 tests: 24-point audit of creation, isolation, switching, duplicate, delete, image safety, migration, project I/O
 │
 └── src/
     ├── main.jsx                    # React DOM root initialization
-    ├── App.jsx                     # Top-level application layout with dark mode background
+    ├── App.jsx                     # Top-level application layout with dark mode background & board init
     ├── index.css                   # Global Tailwind utilities, CSS variables & themed scrollbars
     │
     ├── components/
@@ -595,8 +696,11 @@ SketchFlow/
     │   │   ├── DrawingEngine.js        # Dispatches canvas events to active tool classes
     │   │   └── SelectionManager.js     # 8-point handle hit-testing, cursor styles, and resizing math
     │   │
+    │   ├── boards/
+    │   │   └── BoardManagerModal.jsx   # Dedicated Whiteboards modal: cards, thumbnails, search, sort, rename, delete
+    │   │
     │   ├── layout/
-    │   │   ├── Navbar.jsx              # Header bar: Logo, Export menu, Import, Clear, Theme, Help
+    │   │   ├── Navbar.jsx              # Header bar: Logo, Board Switcher, Export/Project menu, Import, Clear, Theme, Help
     │   │   ├── ThemeToggle.jsx         # 3-state Theme switcher: Light (Sun), Dark (Moon), System (Monitor)
     │   │   ├── Toolbar.jsx             # Floating top-center toolbar housing 11 drawing tools
     │   │   ├── PropertiesPanel.jsx     # Context-sensitive styling controls (Stroke, Fill, Text, Image)
@@ -621,7 +725,7 @@ SketchFlow/
     │       └── EraserTool.js           # Element hit-test eraser with batch undo support
     │
     ├── store/
-    │   ├── canvasStore.js              # Zustand store: elements, selectedIds, toolProperties, history
+    │   ├── canvasStore.js              # Zustand store: boards, elements, selectedIds, toolProperties, history, saveStatus
     │   └── themeStore.js               # Centralized Zustand store: Light, Dark, System preference & listener
     │
     ├── hooks/
@@ -631,8 +735,9 @@ SketchFlow/
         ├── canvasUtils.js              # Transforms (screenToCanvas, canvasToScreen), themed grid, measureText
         ├── geometryUtils.js            # Bounding box calculations, distance formulas, resize handle positions
         ├── hitTestUtils.js             # Exact geometric hit-testing for rectangles, diamonds, circles, lines, images
-        ├── exportUtils.js              # High-DPI PNG export, SVG vector XML generation, JSON serialization/deserialization
+        ├── exportUtils.js              # High-DPI PNG, SVG XML, single-board JSON, and .sketchflow-project export/import
         ├── storageUtils.js             # LocalStorage persistence wrapper with error handling
+        ├── boardStorage.js             # IndexedDB boards database (sketchflow_db v2), migration, and safe orphan cleanup
         ├── imageStorage.js             # IndexedDB asset database (sketchflow_db) with in-memory caching & cleanup
         └── imageUtils.js               # Image validation, safe SVG sanitization, aspect ratio scaling, element creation
 ```
@@ -643,7 +748,7 @@ SketchFlow/
 
 ### 6.1 Automated Test Suites Summary
 
-The project includes six automated test suites run directly via `npm test`:
+The project includes seven automated test suites run directly via `npm test`:
 
 | Test Suite | File | Tests Run | Result | Scope & Focus |
 | :--- | :--- | :---: | :---: | :--- |
@@ -653,7 +758,8 @@ The project includes six automated test suites run directly via `npm test`:
 | **Text Tool Workflow Audit**| `tests/textToolWorkflowAudit.mjs`| 50 | 50 Passed | Complete 10-step text creation workflow, multiline editing, Escape cancel, double-click in-place editing, persistence, and regression on all drawing tools. |
 | **Image Tool Audit** | `tests/imageToolAudit.mjs` | 59 | 59 Passed | Format validation (PNG, JPG, WebP, SVG), SVG security sanitization (stripping scripts & handlers), 25MB limit, IndexedDB storage, 8-handle resizing with aspect ratio lock, rotation, opacity, multi-selection, undo/redo, 50%–200% zoom, and portable export/import. |
 | **Theme System Audit** | `tests/themeAudit.mjs` | 32 | 32 Passed | Light/Dark/System theme resolution, LocalStorage persistence, DOM attribute synchronization, dynamic OS preference change listener, zero element color mutation, undo/redo history isolation, export invariance, and theme-adaptive grid rendering. |
-| **Total** | | **236** | **236 Passed (0 Failed)** | **100% Automated Test Pass Rate** |
+| **Multiple Boards Audit** | `tests/multipleBoardsAudit.mjs` | 83 | 83 Passed | Creation, unique IDs, data independence, switching lifecycle, refresh persistence, rename validation, duplicate deep-clone, delete inactive/active/last, image asset safety, orphan cleanup, legacy migration, migration idempotency, undo/redo isolation, viewport isolation, rapid switching race conditions, project export/import, single-board compatibility, Light & Dark modes, search & sorting. |
+| **Total** | | **298** | **298 Passed (0 Failed)** | **100% Automated Test Pass Rate** |
 
 ### 6.2 Test Coverage Highlights
 - **Geometry & Math:** Verified Pythagorean distance, rectangle normalization with negative dimensions, group bounding box generation, 4-corner rotated bounds, and segment distance.
@@ -690,10 +796,10 @@ The production build is executed using Vite and compiles the application into op
 ### Build Output & Asset Sizes
 ```
 dist/index.html                   2.17 kB │ gzip:  1.03 kB
-dist/assets/index-BlCF18we.css   27.76 kB │ gzip:  5.43 kB
-dist/assets/index-CUhC0c3P.js   274.81 kB │ gzip: 79.01 kB
+dist/assets/index-CZWB9CqE.css   33.84 kB │ gzip:  6.18 kB
+dist/assets/index-ByPl086x.js   314.31 kB │ gzip: 87.41 kB
 ```
-- **Total Compressed Size:** ~85.47 kB (gzipped)
+- **Total Compressed Size:** ~94.62 kB (gzipped)
 
 ---
 
@@ -701,6 +807,7 @@ dist/assets/index-CUhC0c3P.js   274.81 kB │ gzip: 79.01 kB
 
 | Module | Status | Verification Method |
 | :--- | :---: | :--- |
+| **Multiple Boards Management** | **Implemented** | 83-test suite: creation, isolation, switching, duplicate, delete, image safety, migration, project I/O |
 | **Drawing Tools (11 Tools)** | **Implemented** | Automated tool lifecycle & regression tests (236 tests) |
 | **Light & Dark Theme System** | **Implemented** | 32-test suite: Light/Dark/System, persistence, listeners, canvas protection |
 | **Image Upload & Manipulation** | **Implemented** | 59-test suite: formats, sanitization, IndexedDB, transforms, export |
@@ -708,10 +815,11 @@ dist/assets/index-CUhC0c3P.js   274.81 kB │ gzip: 79.01 kB
 | **Canvas Viewport (Pan/Zoom)** | **Implemented** | Sub-pixel coordinate transformation math tests |
 | **Text Tool & Inline Editing** | **Implemented** | 50-step dedicated text workflow test suite |
 | **Properties & Styling Panel** | **Implemented** | Automated store property mutation & styling tests |
-| **Undo / Redo History Stack** | **Implemented** | Multi-operation history chain tests |
+| **Undo / Redo History Stack** | **Implemented** | Multi-operation history chain & per-board isolation tests |
 | **PNG, SVG & JSON Export** | **Implemented** | Validated SVG vector XML, 2x canvas & asset bundling |
+| **.sketchflow-project Export/Import** | **Implemented** | Multi-board project packaging, ID collision handling & asset restore |
 | **JSON File Import** | **Implemented** | Schema validation, asset unpacking & sanitization tests |
-| **LocalStorage & IndexedDB Sync** | **Implemented** | Segregated storage: lightweight metadata + binary blobs |
+| **LocalStorage & IndexedDB Sync** | **Implemented** | Segregated storage: lightweight metadata + binary blobs + boards store |
 | **Keyboard Shortcuts (`?` modal)**| **Implemented** | Global key listener implementation (shortcuts 1-9, V, H, R, etc.) |
 | **Real Browser Hardware Testing**| **Pending QA** | Requires manual verification across browsers |
 | **Physical Touch Device QA** | **Pending QA** | Requires testing on iOS Safari & Android Chrome |

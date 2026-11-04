@@ -2,6 +2,19 @@ import { create } from 'zustand';
 import { generateId, measureText } from '../utils/canvasUtils.js';
 import { getElementBounds, getElementsBounds } from '../utils/geometryUtils.js';
 import { saveToStorage, loadFromStorage, clearStorage } from '../utils/storageUtils.js';
+import {
+  saveBoard,
+  getBoard,
+  getAllBoardsMetadata,
+  deleteBoard as deleteBoardStorage,
+  createDefaultBoard,
+  migrateLegacyBoard,
+  getActiveBoardId,
+  setActiveBoardId,
+  generateBoardId,
+  generateBoardThumbnail
+} from '../utils/boardStorage.js';
+import { loadImageAsset } from '../utils/imageStorage.js';
 
 const DEFAULT_PROPERTIES = {
   strokeColor: '#1e1e1e',
@@ -20,16 +33,72 @@ const DEFAULT_PROPERTIES = {
 const MAX_HISTORY = 50;
 let saveDebounceTimer = null;
 
+// Per-board session history stack cache: boardId -> { history: Array, historyIndex: number }
+const boardHistoryCache = new Map();
+
 function debouncedSave(state) {
   if (saveDebounceTimer) clearTimeout(saveDebounceTimer);
-  saveDebounceTimer = setTimeout(() => {
-    saveToStorage({
-      elements: state.elements,
-      panOffset: state.panOffset,
-      zoom: state.zoom,
-      gridType: state.gridType,
-      elementProperties: state.toolProperties
-    });
+
+  // Set saving indicator
+  useCanvasStore.setState({ saveStatus: 'saving' });
+
+  saveDebounceTimer = setTimeout(async () => {
+    try {
+      const currentState = useCanvasStore.getState();
+      const boardId = currentState.activeBoardId || 'board_default';
+
+      const boardRecord = {
+        id: boardId,
+        name: currentState.activeBoardName || 'Untitled Board',
+        elements: currentState.elements,
+        viewport: {
+          zoom: currentState.zoom,
+          panX: currentState.panOffset.x,
+          panY: currentState.panOffset.y
+        },
+        gridSettings: {
+          gridType: currentState.gridType
+        },
+        thumbnail: generateBoardThumbnail(currentState.elements) || null,
+        metadata: {
+          elementCount: currentState.elements.length
+        }
+      };
+
+      // 1. Save to IndexedDB
+      const success = await saveBoard(boardRecord);
+
+      // 2. Also keep LocalStorage in sync for backwards compatibility with legacy tests
+      saveToStorage({
+        elements: currentState.elements,
+        panOffset: currentState.panOffset,
+        zoom: currentState.zoom,
+        gridType: currentState.gridType,
+        elementProperties: currentState.toolProperties
+      });
+
+      if (success !== false) {
+        useCanvasStore.setState((s) => ({
+          saveStatus: 'saved',
+          boardsList: s.boardsList.map((b) =>
+            b.id === boardId
+              ? {
+                  ...b,
+                  name: boardRecord.name,
+                  elementCount: boardRecord.metadata.elementCount,
+                  updatedAt: Date.now(),
+                  thumbnail: boardRecord.thumbnail
+                }
+              : b
+          )
+        }));
+      } else {
+        useCanvasStore.setState({ saveStatus: 'error' });
+      }
+    } catch (err) {
+      console.warn('Debounced save error:', err);
+      useCanvasStore.setState({ saveStatus: 'error' });
+    }
   }, 400);
 }
 
@@ -45,6 +114,16 @@ export const useCanvasStore = create((set, get) => ({
     ...DEFAULT_PROPERTIES,
     ...(savedData?.appState?.elementProperties || {})
   },
+
+  // Multiple Boards State
+  activeBoardId: getActiveBoardId() || 'board_default',
+  activeBoardName: 'My Whiteboard',
+  boardsList: [],
+  saveStatus: 'saved', // 'saved' | 'saving' | 'error'
+  isBoardLoading: false,
+  showBoardManager: false,
+
+  setShowBoardManager: (show) => set({ showBoardManager: show }),
 
   // Canvas Viewport State
   panOffset: savedData?.appState?.panOffset || { x: 0, y: 0 },
@@ -155,22 +234,29 @@ export const useCanvasStore = create((set, get) => ({
 
   // History / Undo / Redo
   pushHistory: (newElements) => {
-    const { history, historyIndex } = get();
+    const { history, historyIndex, activeBoardId } = get();
     const newHistory = history.slice(0, historyIndex + 1);
     const snapshot = JSON.parse(JSON.stringify(newElements));
     newHistory.push(snapshot);
     if (newHistory.length > MAX_HISTORY) {
       newHistory.shift();
     }
+    const nextIdx = newHistory.length - 1;
     set({
       history: newHistory,
-      historyIndex: newHistory.length - 1
+      historyIndex: nextIdx
     });
+    if (activeBoardId) {
+      boardHistoryCache.set(activeBoardId, {
+        history: newHistory,
+        historyIndex: nextIdx
+      });
+    }
     debouncedSave(get());
   },
 
   undo: () => {
-    const { history, historyIndex } = get();
+    const { history, historyIndex, activeBoardId } = get();
     if (historyIndex > 0) {
       const nextIndex = historyIndex - 1;
       const prevElements = JSON.parse(JSON.stringify(history[nextIndex]));
@@ -179,12 +265,18 @@ export const useCanvasStore = create((set, get) => ({
         historyIndex: nextIndex,
         selectedIds: []
       });
+      if (activeBoardId) {
+        boardHistoryCache.set(activeBoardId, {
+          history,
+          historyIndex: nextIndex
+        });
+      }
       debouncedSave(get());
     }
   },
 
   redo: () => {
-    const { history, historyIndex } = get();
+    const { history, historyIndex, activeBoardId } = get();
     if (historyIndex < history.length - 1) {
       const nextIndex = historyIndex + 1;
       const nextElements = JSON.parse(JSON.stringify(history[nextIndex]));
@@ -193,6 +285,12 @@ export const useCanvasStore = create((set, get) => ({
         historyIndex: nextIndex,
         selectedIds: []
       });
+      if (activeBoardId) {
+        boardHistoryCache.set(activeBoardId, {
+          history,
+          historyIndex: nextIndex
+        });
+      }
       debouncedSave(get());
     }
   },
@@ -532,7 +630,7 @@ export const useCanvasStore = create((set, get) => ({
       elements: emptyElements,
       selectedIds: []
     });
-    clearStorage();
+    debouncedSave(get());
   },
 
   loadDrawing: (elements, appState = {}) => {
@@ -545,5 +643,333 @@ export const useCanvasStore = create((set, get) => ({
       gridType: appState.gridType || get().gridType
     });
     debouncedSave(get());
+  },
+
+  // --- Multiple Boards Actions ---
+
+  /**
+   * Initializes boards on startup (runs idempotent legacy migration & loads active board)
+   */
+  initBoards: async () => {
+    try {
+      const activeBoard = await migrateLegacyBoard();
+      const metadataList = await getAllBoardsMetadata();
+
+      if (activeBoard) {
+        // Preload any image elements on the active board
+        if (Array.isArray(activeBoard.elements)) {
+          for (const el of activeBoard.elements) {
+            if (el.type === 'image' && el.fileId) {
+              loadImageAsset(el.fileId);
+            }
+          }
+        }
+
+        set({
+          activeBoardId: activeBoard.id,
+          activeBoardName: activeBoard.name || 'Untitled Board',
+          elements: JSON.parse(JSON.stringify(activeBoard.elements || [])),
+          panOffset: {
+            x: activeBoard.viewport?.panX ?? activeBoard.viewport?.x ?? 0,
+            y: activeBoard.viewport?.panY ?? activeBoard.viewport?.y ?? 0
+          },
+          zoom: activeBoard.viewport?.zoom || 1,
+          gridType: activeBoard.gridSettings?.gridType || activeBoard.gridType || 'dots',
+          boardsList: metadataList,
+          history: [JSON.parse(JSON.stringify(activeBoard.elements || []))],
+          historyIndex: 0,
+          saveStatus: 'saved'
+        });
+      } else {
+        set({ boardsList: metadataList });
+      }
+    } catch (err) {
+      console.warn('Failed to initialize boards system:', err);
+    }
+  },
+
+  /**
+   * Refreshes the boardsList metadata array from storage
+   */
+  refreshBoardsList: async () => {
+    try {
+      const metadataList = await getAllBoardsMetadata();
+      set({ boardsList: metadataList });
+      return metadataList;
+    } catch (err) {
+      console.warn('Failed to refresh boards list:', err);
+      return [];
+    }
+  },
+
+  /**
+   * Immediately saves the active board without waiting for debounce timeout
+   */
+  flushSaveCurrentBoard: async () => {
+    if (saveDebounceTimer) {
+      clearTimeout(saveDebounceTimer);
+      saveDebounceTimer = null;
+    }
+
+    const currentState = get();
+    const boardId = currentState.activeBoardId || 'board_default';
+
+    const boardRecord = {
+      id: boardId,
+      name: currentState.activeBoardName || 'Untitled Board',
+      elements: currentState.elements,
+      viewport: {
+        zoom: currentState.zoom,
+        panX: currentState.panOffset.x,
+        panY: currentState.panOffset.y
+      },
+      gridSettings: {
+        gridType: currentState.gridType
+      },
+      thumbnail: generateBoardThumbnail(currentState.elements) || null,
+      metadata: {
+        elementCount: currentState.elements.length
+      }
+    };
+
+    await saveBoard(boardRecord);
+
+    saveToStorage({
+      elements: currentState.elements,
+      panOffset: currentState.panOffset,
+      zoom: currentState.zoom,
+      gridType: currentState.gridType,
+      elementProperties: currentState.toolProperties
+    });
+
+    set({ saveStatus: 'saved' });
+  },
+
+  /**
+   * Create a new empty board and switch to it
+   */
+  createBoard: async (customName = null) => {
+    // 1. Flush save of current board
+    await get().flushSaveCurrentBoard();
+
+    // 2. Generate name
+    const { boardsList } = get();
+    let name = customName;
+    if (!name) {
+      const untitledCount = boardsList.filter((b) => b.name?.startsWith('Untitled Board')).length;
+      name = untitledCount > 0 ? `Untitled Board ${untitledCount + 1}` : 'Untitled Board';
+    }
+
+    // 3. Create new default board in storage
+    const newBoard = await createDefaultBoard(name);
+    setActiveBoardId(newBoard.id);
+
+    // 4. Update canvas state with independent blank slate
+    boardHistoryCache.set(newBoard.id, {
+      history: [[]],
+      historyIndex: 0
+    });
+
+    set({
+      activeBoardId: newBoard.id,
+      activeBoardName: newBoard.name,
+      elements: [],
+      selectedIds: [],
+      panOffset: { x: 0, y: 0 },
+      zoom: 1,
+      gridType: 'dots',
+      history: [[]],
+      historyIndex: 0,
+      saveStatus: 'saved'
+    });
+
+    await get().refreshBoardsList();
+    return newBoard;
+  },
+
+  /**
+   * Switch to another board by ID
+   */
+  switchBoard: async (boardId) => {
+    if (!boardId || boardId === get().activeBoardId) return true;
+
+    // 1. Immediately flush save the active board so no work is lost
+    await get().flushSaveCurrentBoard();
+
+    // Cache current board's history stack before switching away
+    const currentId = get().activeBoardId;
+    if (currentId) {
+      boardHistoryCache.set(currentId, {
+        history: JSON.parse(JSON.stringify(get().history)),
+        historyIndex: get().historyIndex
+      });
+    }
+
+    set({ isBoardLoading: true });
+
+    try {
+      // 2. Load target board from storage
+      const board = await getBoard(boardId);
+      if (!board) {
+        set({ isBoardLoading: false });
+        console.warn(`Board ${boardId} not found`);
+        return false;
+      }
+
+      // 3. Preload any image elements asynchronously
+      if (Array.isArray(board.elements)) {
+        for (const el of board.elements) {
+          if (el.type === 'image' && el.fileId) {
+            loadImageAsset(el.fileId);
+          }
+        }
+      }
+
+      // 4. Restore state with deep clone to prevent shared references
+      const clonedElements = JSON.parse(JSON.stringify(board.elements || []));
+      setActiveBoardId(board.id);
+
+      // Restore board's independent history stack
+      let restoredHistory = [JSON.parse(JSON.stringify(clonedElements))];
+      let restoredHistoryIndex = 0;
+      if (boardHistoryCache.has(board.id)) {
+        const cached = boardHistoryCache.get(board.id);
+        restoredHistory = cached.history;
+        restoredHistoryIndex = cached.historyIndex;
+      } else {
+        boardHistoryCache.set(board.id, {
+          history: restoredHistory,
+          historyIndex: restoredHistoryIndex
+        });
+      }
+
+      set({
+        activeBoardId: board.id,
+        activeBoardName: board.name || 'Untitled Board',
+        elements: clonedElements,
+        selectedIds: [],
+        panOffset: {
+          x: board.viewport?.panX ?? board.viewport?.x ?? 0,
+          y: board.viewport?.panY ?? board.viewport?.y ?? 0
+        },
+        zoom: board.viewport?.zoom || 1,
+        gridType: board.gridSettings?.gridType || board.gridType || 'dots',
+        history: restoredHistory,
+        historyIndex: restoredHistoryIndex,
+        isBoardLoading: false,
+        saveStatus: 'saved'
+      });
+
+      await get().refreshBoardsList();
+      return true;
+    } catch (err) {
+      console.warn('Error switching board:', err);
+      set({ isBoardLoading: false });
+      return false;
+    }
+  },
+
+  /**
+   * Rename an existing board
+   */
+  renameBoard: async (boardId, newName) => {
+    const trimmed = (newName || '').trim();
+    if (!trimmed) {
+      throw new Error('Board name cannot be empty.');
+    }
+
+    const board = await getBoard(boardId);
+    if (!board) {
+      throw new Error('Board not found.');
+    }
+
+    board.name = trimmed;
+    board.updatedAt = Date.now();
+    await saveBoard(board);
+
+    if (boardId === get().activeBoardId) {
+      set({ activeBoardName: trimmed });
+    }
+
+    await get().refreshBoardsList();
+    return true;
+  },
+
+  /**
+   * Duplicate a board into a new independent board
+   */
+  duplicateBoard: async (boardId) => {
+    const original = await getBoard(boardId);
+    if (!original) {
+      throw new Error('Board to duplicate not found.');
+    }
+
+    // Deep clone elements with new element IDs for full independence
+    const clonedElements = (original.elements || []).map((el) => {
+      const copy = JSON.parse(JSON.stringify(el));
+      copy.id = generateId();
+      return copy;
+    });
+
+    const newId = generateBoardId();
+    const dupBoard = {
+      id: newId,
+      name: `${original.name || 'Untitled Board'} (Copy)`,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      elements: clonedElements,
+      viewport: JSON.parse(JSON.stringify(original.viewport || { zoom: 1, panX: 0, panY: 0 })),
+      gridSettings: JSON.parse(JSON.stringify(original.gridSettings || { gridType: 'dots' })),
+      thumbnail: original.thumbnail || null,
+      metadata: {
+        elementCount: clonedElements.length
+      }
+    };
+
+    await saveBoard(dupBoard);
+    await get().refreshBoardsList();
+    return dupBoard;
+  },
+
+  /**
+   * Delete a board by ID (with safe switch if active, and safe image cleanup)
+   */
+  deleteBoard: async (boardId) => {
+    if (!boardId) return false;
+
+    const isActive = boardId === get().activeBoardId;
+
+    // Delete from storage and clear cached history
+    boardHistoryCache.delete(boardId);
+    await deleteBoardStorage(boardId);
+
+    const remaining = await getAllBoardsMetadata();
+    set({ boardsList: remaining });
+
+    if (isActive) {
+      if (remaining.length > 0) {
+        // Switch to the first remaining board
+        await get().switchBoard(remaining[0].id);
+      } else {
+        // Last board was deleted: create a fresh default board
+        const freshBoard = await createDefaultBoard('Untitled Board');
+        setActiveBoardId(freshBoard.id);
+        set({
+          activeBoardId: freshBoard.id,
+          activeBoardName: freshBoard.name,
+          elements: [],
+          selectedIds: [],
+          panOffset: { x: 0, y: 0 },
+          zoom: 1,
+          gridType: 'dots',
+          history: [[]],
+          historyIndex: 0,
+          saveStatus: 'saved'
+        });
+        await get().refreshBoardsList();
+      }
+    }
+
+    return true;
   }
 }));

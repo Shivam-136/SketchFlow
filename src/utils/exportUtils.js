@@ -7,19 +7,39 @@ import {
   saveImageBlob,
   base64ToBlob
 } from './imageStorage.js';
+import {
+  getAllBoards,
+  saveBoard,
+  getActiveBoardId,
+  generateBoardId
+} from './boardStorage.js';
 
 /**
  * Trigger file download in browser
  */
 function downloadFile(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  if (
+    typeof window === 'undefined' ||
+    typeof document === 'undefined' ||
+    !document.body ||
+    typeof document.body.appendChild !== 'function'
+  ) {
+    return;
+  }
+  try {
+    const url = URL.createObjectURL ? URL.createObjectURL(blob) : 'mock_url';
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    if (URL.revokeObjectURL) {
+      URL.revokeObjectURL(url);
+    }
+  } catch (err) {
+    // Ignore download errors in non-browser environments
+  }
 }
 
 /**
@@ -350,5 +370,126 @@ export function importFromJSON(fileContent) {
     };
   } catch (err) {
     throw new Error('Failed to parse JSON file: ' + err.message);
+  }
+}
+
+/**
+ * Export entire project with all boards and bundled image assets (.sketchflow-project)
+ */
+export async function exportProjectToJSON(filename = `sketchflow-project-${Date.now()}.sketchflow-project`) {
+  const allBoards = await getAllBoards();
+  const assets = {};
+
+  for (const board of allBoards) {
+    if (Array.isArray(board.elements)) {
+      for (const el of board.elements) {
+        if (el.type === 'image' && el.fileId && !assets[el.fileId]) {
+          const rec = getImageRecordSync(el.fileId);
+          if (rec && rec.base64) {
+            assets[el.fileId] = {
+              mimeType: rec.mimeType || 'image/png',
+              base64: rec.base64
+            };
+          }
+        }
+      }
+    }
+  }
+
+  const projectData = {
+    type: 'sketchflow-project',
+    version: 1,
+    source: 'https://sketchflow.app',
+    exportedAt: new Date().toISOString(),
+    activeBoardId: getActiveBoardId() || allBoards[0]?.id || null,
+    boards: allBoards,
+    assets: Object.keys(assets).length > 0 ? assets : undefined
+  };
+
+  const blob = new Blob([JSON.stringify(projectData, null, 2)], { type: 'application/json' });
+  downloadFile(blob, filename);
+  return projectData;
+}
+
+/**
+ * Import a multi-board SketchFlow project from JSON
+ */
+export async function importProjectFromJSON(fileContent) {
+  try {
+    const data = typeof fileContent === 'string' ? JSON.parse(fileContent) : fileContent;
+    if (!data || !Array.isArray(data.boards) || data.boards.length === 0) {
+      throw new Error('Invalid project file: "boards" array is missing or empty.');
+    }
+
+    // 1. Restore bundled image assets into IndexedDB & memory cache
+    if (data.assets && typeof data.assets === 'object') {
+      for (const [fileId, asset] of Object.entries(data.assets)) {
+        if (asset && asset.base64) {
+          const mimeType = asset.mimeType || 'image/png';
+          const blob = base64ToBlob(asset.base64, mimeType);
+          if (blob) {
+            await saveImageBlob(fileId, blob, mimeType, asset.base64);
+            loadImageAsset(fileId);
+          }
+        }
+      }
+    }
+
+    // 2. Fetch current existing boards to resolve any ID collisions
+    const existing = await getAllBoards();
+    const existingIds = new Set(existing.map((b) => b.id));
+
+    const importedBoards = [];
+    for (const b of data.boards) {
+      const isCollision = existingIds.has(b.id);
+      const newId = isCollision ? generateBoardId() : (b.id || generateBoardId());
+      const newName = isCollision ? `${b.name || 'Untitled Board'} (Imported)` : (b.name || 'Untitled Board');
+
+      // Sanitize elements
+      const elements = Array.isArray(b.elements) ? b.elements.map((el, i) => ({
+        ...el,
+        id: el.id || `el_${i}_${Date.now()}`,
+        type: el.type || 'rectangle',
+        x: Number(el.x) || 0,
+        y: Number(el.y) || 0,
+        width: Number(el.width) || 0,
+        height: Number(el.height) || 0
+      })) : [];
+
+      const sanitizedBoard = {
+        id: newId,
+        name: newName,
+        createdAt: b.createdAt || Date.now(),
+        updatedAt: b.updatedAt || Date.now(),
+        elements,
+        viewport: {
+          zoom: Number(b.viewport?.zoom) || 1,
+          panX: Number(b.viewport?.panX ?? b.viewport?.x ?? 0),
+          panY: Number(b.viewport?.panY ?? b.viewport?.y ?? 0)
+        },
+        gridSettings: {
+          gridType: b.gridSettings?.gridType || b.gridType || 'dots'
+        },
+        thumbnail: b.thumbnail || null,
+        metadata: {
+          elementCount: elements.length,
+          ...(b.metadata || {})
+        }
+      };
+
+      await saveBoard(sanitizedBoard);
+      importedBoards.push(sanitizedBoard);
+      existingIds.add(newId);
+    }
+
+    const targetActiveId = importedBoards.find((b) => b.id === data.activeBoardId)?.id || importedBoards[0]?.id;
+
+    return {
+      type: 'project',
+      boards: importedBoards,
+      activeBoardId: targetActiveId
+    };
+  } catch (err) {
+    throw new Error('Failed to import project: ' + err.message);
   }
 }

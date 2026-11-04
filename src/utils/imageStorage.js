@@ -4,7 +4,7 @@
  */
 
 const DB_NAME = 'sketchflow_db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = 'image_assets';
 
 // In-memory fallback for environments without IndexedDB (e.g. Node tests, strict private mode)
@@ -51,6 +51,9 @@ function openDB() {
       const db = e.target.result;
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         db.createObjectStore(STORE_NAME, { keyPath: 'fileId' });
+      }
+      if (!db.objectStoreNames.contains('boards')) {
+        db.createObjectStore('boards', { keyPath: 'id' });
       }
     };
 
