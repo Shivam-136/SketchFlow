@@ -1,6 +1,6 @@
 # SketchFlow — Project Documentation & Engineering Progress
 
-**Document Version:** 1.1.0  
+**Document Version:** 1.2.0  
 **Last Updated:** November 2026  
 **Project Name:** SketchFlow  
 **Project Type:** Excalidraw-inspired Online Whiteboard Application  
@@ -18,6 +18,7 @@
 - **Excalidraw Aesthetic:** Organic, hand-drawn look and feel alongside clean geometric rendering options, custom fill algorithms (hachure cross-hatching, semi-translucent, solid), and distinct roughness presets.
 - **Robust Tooling Suite:** Complete vector primitives (rectangles, circles, diamonds, arrows, lines), freehand pencil strokes, multiline text elements, local image elements, and an object eraser.
 - **State Management & History:** Full undo/redo history stacks, multi-selection marquee, eight-point transform handles, layer depth ordering, and persistent session storage.
+- **Universal Theme Engine:** Production-ready Light Mode, Dark Mode, and System Default themes with zero visual flashing, LocalStorage persistence, and 100% canvas drawing color protection.
 
 ### 1.2 Architecture Diagram
 
@@ -27,7 +28,7 @@
 |  +--------------------+  +-----------------------+  +--------------------------------+  |
 |  |     Navbar.jsx     |  |      Toolbar.jsx      |  |      PropertiesPanel.jsx       |  |
 |  |  (Export/Import/   |  |   (11 Active Tools,   |  | (Stroke, Fill, Roughness,      |  |
-|  |   Clear / Help)    |  |    Tool Switching)    |  |  Fonts, Image Props, Opacity) |  |
+|  | Clear/Theme/Help)  |  |    Tool Switching)    |  |  Fonts, Image Props, Opacity) |  |
 |  +--------------------+  +-----------------------+  +--------------------------------+  |
 |                                                                                         |
 |  +-----------------------------------------------------------------------------------+  |
@@ -36,7 +37,7 @@
 |  |  |           HTML5 Canvas              |  |         Inline Textarea DOM        |  |  |
 |  |  | (Pointer Events, Viewport Transform,|  |  (Caret navigation, Multiline typing|  |  |
 |  |  |   High-DPI Retina, Drag & Drop,     |  |    Ctrl+Enter commit, Esc cancel)  |  |  |
-|  |  |        Clipboard Paste)             |  |                                    |  |  |
+|  |  |   Theme-Aware Canvas & Grid)        |  |                                    |  |  |
 |  |  +------------------+------------------+  +-----------------+------------------+  |  |
 |  +---------------------|---------------------------------------|---------------------+  |
 |                        |                                       |                        |
@@ -50,8 +51,8 @@
 |  +-------------------------------------+---------------------------------------------+  |
 |                                        |                                                |
 |  +-------------------------------------v---------------------------------------------+  |
-|  |                               canvasStore.js (Zustand)                            |  |
-|  |     Single Source of Truth: elements, selectedIds, toolProperties, history stacks |  |
+|  |              canvasStore.js & themeStore.js (Zustand Central State)               |  |
+|  |  Elements, selectedIds, toolProperties, history, viewport, Light/Dark/System State |  |
 |  +------------------+----------------------------------+-----------------------------+  |
 |                     |                                  |                                |
 |  +------------------v---------------+  +---------------v-----------------------------+  |
@@ -358,6 +359,55 @@ Located in the floating sidebar (`PropertiesPanel.jsx`), adapting contextually t
 - **Multi-Selection:** Images seamlessly combine with vector shapes in marquee selections, group translations, and batch actions.
 - **Cross-Machine Portability:** Exported `.sketchflow` JSON files serialize all referenced image assets into an `assets` dictionary (`{ [fileId]: { mimeType, base64 } }`), allowing diagrams to be shared and opened on any computer without missing images.
 
+### 3.10 Theme System (Light Mode, Dark Mode, System Default)
+
+```
+                            [Theme Selection]
+                  ┌─────────────────┼─────────────────┐
+                  ▼                 ▼                 ▼
+             [Light Mode]      [Dark Mode]     [System Default]
+              (Sun Icon)       (Moon Icon)      (Monitor Icon)
+                  │                 │                 │
+                  └─────────────────┼─────────────────┘
+                                    │
+                                    ▼
+                      [useThemeStore State Manager]
+                       - themePreference: 'light' | 'dark' | 'system'
+                       - resolvedTheme: 'light' | 'dark'
+                       - localStorage: 'sketchflow_theme_preference'
+                                    │
+                                    ▼
+                      [DOM Synchronization & Tokens]
+                       - html.classList.toggle('dark', isDark)
+                       - html.setAttribute('data-theme', resolved)
+                       - CSS variables: --sketch-bg, --sketch-panel,
+                         --sketch-border, --sketch-text, --sketch-grid-*
+                       - Immediate <head> anti-flash execution
+                                    │
+                  ┌─────────────────┴─────────────────┐
+                  ▼                                   ▼
+       [UI Panels & Components]           [Canvas Rendering Engine]
+       - Navbar, Toolbar, Panels,         - Background: #fbfbfa / #121212
+         Modals, Dropdowns, Tooltips,     - Grid dots & lines adapt
+         Inputs, Scrollbars adapt         - DRAWING ELEMENTS 100% INVARIANT:
+                                            strokeColor, fillColor, text colors,
+                                            image pixels, and exports UNTOUCHED
+```
+
+#### Theme Preferences
+1. **Light Mode (`light`):** Clean, paper-white canvas background (`#fbfbfa`), pure white floating panels (`#ffffff`), subtle gray borders (`#e4e4e7`), and crisp dark typography (`#18181b`).
+2. **Dark Mode (`dark`):** High-contrast dark canvas workspace (`#121212`), elevated charcoal panels (`#1e1e1e`), subtle dark borders (`#27272a`), and readable light typography (`#f4f4f5`).
+3. **System Default (`system`):** Follows the operating system's color scheme via `window.matchMedia('(prefers-color-scheme: dark)')` with real-time dynamic listener callbacks.
+
+#### Zero-Flash Initialization
+An inline, synchronous script in `<head>` of `index.html` inspects `sketchflow_theme_preference` in LocalStorage before the DOM paints, instantly toggling `.dark` on `document.documentElement` and eliminating light-to-dark flashing.
+
+#### Canvas Protection & Color Invariance (Critical Design Contract)
+- **Zero Drawing Alteration:** Changing application themes does **NOT** modify or invert drawing element colors. A black shape stroke drawn as `#1e1e1e` remains `#1e1e1e`; colored arrows, rectangles, diamonds, and freehand pencil paths retain their exact hex values.
+- **Image Pixel Protection:** Bitmaps and SVG vector images are rendered directly without CSS filters (`filter: invert(...)` is strictly forbidden).
+- **Undo / Redo Isolation:** Theme switching does not pollute or mutate canvas undo/redo history stacks.
+- **Export Fidelity:** Exported PNG, SVG, and JSON files retain the user's authentic drawing elements, colors, and asset embeddings without theme interference.
+
 ---
 
 ## 4. Major Bugs Identified and Fixed
@@ -486,16 +536,41 @@ Located in the floating sidebar (`PropertiesPanel.jsx`), adapting contextually t
 
 ---
 
+### 4.4 Theme Integration & Invariance Fixes
+
+#### Issue 17: White Flash on Initial Page Load in Dark Mode
+- **Problem:** When Dark Mode was selected, reloading the browser rendered a blinding white canvas for ~100–300ms before React hydrated and applied the theme.
+- **Root Cause:** Theme classes were applied inside a React `useEffect` hook, which runs asynchronously after initial DOM paint.
+- **Solution:** Injected an immediate, synchronous `<script>` tag inside `<head>` of `index.html`. It reads `localStorage.getItem('sketchflow_theme_preference')` and immediately applies `class="dark"` to `document.documentElement` before the browser paints the first frame.
+- **Files Modified:** [`index.html`](file:///c:/Users/ASUS/OneDrive/Desktop/SketchFlow/index.html).
+- **Verification Status:** Verified. Zero-flash paint confirmed across hard reloads.
+
+#### Issue 18: Canvas Grid and Background Contrast Inversion
+- **Problem:** When switching to Dark Mode, the canvas grid dots (`#d4d4d8`) and lines (`#e4e4e7`) disappeared or washed out against the dark canvas background (`#121212`).
+- **Root Cause:** Hardcoded light color hexes in `drawGrid` inside `canvasUtils.js`.
+- **Solution:** Added `isDark` theme awareness to `drawGrid`: in dark mode, dots use `#3f3f46` (zinc-700) and lines use `#27272a` (zinc-800); in light mode, dots use `#d4d4d8` and lines use `#e4e4e7`.
+- **Files Modified:** [`src/utils/canvasUtils.js`](file:///c:/Users/ASUS/OneDrive/Desktop/SketchFlow/src/utils/canvasUtils.js), [`src/components/canvas/Whiteboard.jsx`](file:///c:/Users/ASUS/OneDrive/Desktop/SketchFlow/src/components/canvas/Whiteboard.jsx).
+- **Verification Status:** Verified in `tests/themeAudit.mjs`.
+
+#### Issue 19: Drawing Element Color Mutation Prevention
+- **Problem:** In typical dark mode implementations, global CSS invert filters or CSS variable inheritance accidentally invert the user's artwork (e.g., turning a black line white or altering hex values).
+- **Root Cause:** Unscoped CSS rules or canvas filter mutations altering canvas 2D context colors.
+- **Solution:** Enforced strict separation between UI shell styling and canvas 2D rendering. Canvas elements retain their exact user-selected hex colors (`strokeColor`, `backgroundColor`, text `color`, image pixels). Only UI controls and canvas viewport background adapt.
+- **Files Created/Modified:** [`src/store/themeStore.js`](file:///c:/Users/ASUS/OneDrive/Desktop/SketchFlow/src/store/themeStore.js), [`src/components/canvas/Whiteboard.jsx`](file:///c:/Users/ASUS/OneDrive/Desktop/SketchFlow/src/components/canvas/Whiteboard.jsx).
+- **Verification Status:** Verified in `tests/themeAudit.mjs` Section 5.
+
+---
+
 ## 5. File Structure Documentation
 
 The codebase follows a modular structure decoupling state management, tool logic, canvas rendering, and React UI:
 
 ```
 SketchFlow/
-├── index.html                      # HTML5 entry point and font links
+├── index.html                      # HTML5 entry point, fonts & anti-flash theme script
 ├── package.json                    # Project configuration, scripts, and dependencies
 ├── vite.config.js                  # Vite build configuration with React plugin
-├── tailwind.config.js              # Tailwind theme, typography, and color extensions
+├── tailwind.config.js              # Tailwind theme (darkMode: 'class'), typography & colors
 ├── postcss.config.js               # PostCSS Autoprefixer pipeline
 ├── README.md                       # High-level project summary and shortcut table
 ├── PROJECT_PROGRESS.md             # Comprehensive architecture and progress documentation
@@ -505,32 +580,34 @@ SketchFlow/
 │   ├── storeAndActionsAudit.mjs    # 26 tests: Tool lifecycles, undo/redo, layers, alignment
 │   ├── regressionFlowAudit.mjs     # 30 tests: Combinations, multi-zoom math, stress tests
 │   ├── textToolWorkflowAudit.mjs   # 50 tests: Text creation, multiline, persistence, regressions
-│   └── imageToolAudit.mjs          # 59 tests: Formats, sanitization, IndexedDB, manipulation, zoom, export/import
+│   ├── imageToolAudit.mjs          # 59 tests: Formats, sanitization, IndexedDB, transforms, export
+│   └── themeAudit.mjs              # 32 tests: Light/Dark/System, persistence, listeners, canvas protection
 │
 └── src/
     ├── main.jsx                    # React DOM root initialization
-    ├── App.jsx                     # Top-level application layout integrating panels & canvas
-    ├── index.css                   # Global Tailwind utilities and canvas CSS resets
+    ├── App.jsx                     # Top-level application layout with dark mode background
+    ├── index.css                   # Global Tailwind utilities, CSS variables & themed scrollbars
     │
     ├── components/
     │   ├── canvas/
-    │   │   ├── Whiteboard.jsx          # Primary canvas component, pointer event lifecycle & text overlay
-    │   │   ├── CanvasRenderer.js       # Pure 2D canvas drawing routines (roughness, shapes, images, handles)
+    │   │   ├── Whiteboard.jsx          # Primary canvas, theme-aware background/grid & text overlay
+    │   │   ├── CanvasRenderer.js       # Pure 2D canvas drawing routines (roughness, shapes, images)
     │   │   ├── DrawingEngine.js        # Dispatches canvas events to active tool classes
     │   │   └── SelectionManager.js     # 8-point handle hit-testing, cursor styles, and resizing math
     │   │
     │   ├── layout/
-    │   │   ├── Navbar.jsx              # Header bar: Logo, Export menu, Import file input, Clear modal trigger
+    │   │   ├── Navbar.jsx              # Header bar: Logo, Export menu, Import, Clear, Theme, Help
+    │   │   ├── ThemeToggle.jsx         # 3-state Theme switcher: Light (Sun), Dark (Moon), System (Monitor)
     │   │   ├── Toolbar.jsx             # Floating top-center toolbar housing 11 drawing tools
-    │   │   ├── PropertiesPanel.jsx     # Context-sensitive styling controls (Stroke, Fill, Roughness, Text, Image)
-    │   │   ├── BottomBar.jsx           # Viewport controls: Zoom in/out/reset, Center, Fit to screen, Grid toggle
+    │   │   ├── PropertiesPanel.jsx     # Context-sensitive styling controls (Stroke, Fill, Text, Image)
+    │   │   ├── BottomBar.jsx           # Viewport controls: Zoom in/out/reset, Center, Fit, Grid toggle
     │   │   ├── ShortcutsModal.jsx      # Modal dialog listing complete keyboard shortcut reference
     │   │   └── ConfirmModal.jsx        # Confirmation dialog before canvas clear
     │   │
     │   ├── common/
     │   │   ├── ColorPicker.jsx         # Custom color swatch grid and native color input
-    │   │   ├── IconButton.jsx          # Reusable accessible toolbar button with tooltip
-    │   │   └── Tooltip.jsx             # Hover tooltip with keyboard shortcut indicator
+    │   │   ├── IconButton.jsx          # Themed accessible toolbar button with tooltip
+    │   │   └── Tooltip.jsx             # Themed hover tooltip with keyboard shortcut indicator
     │   │
     │   └── tools/
     │       ├── SelectionTool.js        # Single selection, marquee drag, translation, resize dispatch
@@ -544,15 +621,16 @@ SketchFlow/
     │       └── EraserTool.js           # Element hit-test eraser with batch undo support
     │
     ├── store/
-    │   └── canvasStore.js              # Zustand store: elements, selectedIds, toolProperties, history, viewport
+    │   ├── canvasStore.js              # Zustand store: elements, selectedIds, toolProperties, history
+    │   └── themeStore.js               # Centralized Zustand store: Light, Dark, System preference & listener
     │
     ├── hooks/
     │   └── useKeyboardShortcuts.js     # Global keyboard event listener (V, H, R, O, D, A, L, P, T, 9, E, etc.)
     │
     └── utils/
-        ├── canvasUtils.js              # Coordinate transforms (screenToCanvas, canvasToScreen), grid, measureText
+        ├── canvasUtils.js              # Transforms (screenToCanvas, canvasToScreen), themed grid, measureText
         ├── geometryUtils.js            # Bounding box calculations, distance formulas, resize handle positions
-        ├── hitTestUtils.js             # Exact geometric hit-testing for rectangles, diamonds, circles, lines, text, images
+        ├── hitTestUtils.js             # Exact geometric hit-testing for rectangles, diamonds, circles, lines, images
         ├── exportUtils.js              # High-DPI PNG export, SVG vector XML generation, JSON serialization/deserialization
         ├── storageUtils.js             # LocalStorage persistence wrapper with error handling
         ├── imageStorage.js             # IndexedDB asset database (sketchflow_db) with in-memory caching & cleanup
@@ -565,7 +643,7 @@ SketchFlow/
 
 ### 6.1 Automated Test Suites Summary
 
-The project includes five automated test suites run directly via `npm test`:
+The project includes six automated test suites run directly via `npm test`:
 
 | Test Suite | File | Tests Run | Result | Scope & Focus |
 | :--- | :--- | :---: | :---: | :--- |
@@ -574,13 +652,19 @@ The project includes five automated test suites run directly via `npm test`:
 | **Regression Flow Audit** | `tests/regressionFlowAudit.mjs` | 30 | 30 Passed | Multi-step user workflows (draw -> move -> resize -> color -> undo), coordinate precision at 50%–200% zoom, 1000-shape performance benchmarks. |
 | **Text Tool Workflow Audit**| `tests/textToolWorkflowAudit.mjs`| 50 | 50 Passed | Complete 10-step text creation workflow, multiline editing, Escape cancel, double-click in-place editing, persistence, and regression on all drawing tools. |
 | **Image Tool Audit** | `tests/imageToolAudit.mjs` | 59 | 59 Passed | Format validation (PNG, JPG, WebP, SVG), SVG security sanitization (stripping scripts & handlers), 25MB limit, IndexedDB storage, 8-handle resizing with aspect ratio lock, rotation, opacity, multi-selection, undo/redo, 50%–200% zoom, and portable export/import. |
-| **Total** | | **204** | **204 Passed (0 Failed)** | **100% Automated Test Pass Rate** |
+| **Theme System Audit** | `tests/themeAudit.mjs` | 32 | 32 Passed | Light/Dark/System theme resolution, LocalStorage persistence, DOM attribute synchronization, dynamic OS preference change listener, zero element color mutation, undo/redo history isolation, export invariance, and theme-adaptive grid rendering. |
+| **Total** | | **236** | **236 Passed (0 Failed)** | **100% Automated Test Pass Rate** |
 
 ### 6.2 Test Coverage Highlights
 - **Geometry & Math:** Verified Pythagorean distance, rectangle normalization with negative dimensions, group bounding box generation, 4-corner rotated bounds, and segment distance.
 - **Resize Handles & Aspect Ratio:** Verified handle detection on all 8 corners and borders with visual padding compensation; verified aspect ratio preservation during corner drags for images and freeform scaling when unlocked.
 - **Coordinate Inversion & Rotations:** Roundtrip mathematical accuracy verified between `screenToCanvas` and `canvasToScreen` at 50%, 75%, 100%, 150%, and 200% zoom with zero floating-point drift (`delta < 1e-9`); inverse matrix rotation transforms validated for rotated image hit-testing.
 - **Image Security & Storage:** Client-side SVG DOM sanitization validated against malicious tags (`<script>`, `<foreignObject>`) and inline JavaScript handlers; IndexedDB transactional blob read/write validated.
+- **Theme Invariance & Protection:**
+  - 100% color invariance confirmed for all drawing elements (rectangles, circles, diamonds, arrows, lines, pencil paths, text elements, and images) when toggling between Light Mode, Dark Mode, and System Default.
+  - Undo and redo history stacks remain completely unpolluted by theme switching.
+  - Zero-flash startup verified using immediate `<script>` execution in `index.html`.
+  - SVG and JSON exports verified to preserve original user artwork colors and attributes across all themes.
 - **Performance Benchmarks:**
   - Bounding box calculation for 1,000 elements executed in **1.05 ms** (well under 20 ms budget).
   - Bounding box for 2,000 elements executed in **0.91 ms** (under 50 ms budget).
@@ -589,7 +673,7 @@ The project includes five automated test suites run directly via `npm test`:
 
 > [!IMPORTANT]
 > **Automated vs. Manual Browser Verification Notice:**  
-> The 204 automated tests execute in a Node.js simulation environment utilizing headless DOM, Canvas 2D context, IndexedDB, and LocalStorage mocks. While these tests verify mathematical logic, state transitions, event lifecycles, and serialization integrity, they are **automated programmatic tests** and do not replace physical hardware QA on actual touch devices or long-term browser memory leak profiling.
+> The 236 automated tests execute in a Node.js simulation environment utilizing headless DOM, Canvas 2D context, IndexedDB, and LocalStorage mocks. While these tests verify mathematical logic, state transitions, event lifecycles, and serialization integrity, they are **automated programmatic tests** and do not replace physical hardware QA on actual touch devices or long-term browser memory leak profiling.
 
 ---
 
@@ -600,16 +684,16 @@ The production build is executed using Vite and compiles the application into op
 - **Build Command:** `npm run build`
 - **Bundler Version:** Vite v5.4.21
 - **Target:** ECMAScript Modern Browsers (`esbuild`)
-- **Compilation Time:** ~12.5 seconds
+- **Compilation Time:** ~13.5 seconds
 - **Exit Code:** 0 (Clean build, zero warnings or errors)
 
 ### Build Output & Asset Sizes
 ```
-dist/index.html                   1.22 kB │ gzip:  0.70 kB
-dist/assets/index-DWVH_Ef9.css   22.24 kB │ gzip:  4.67 kB
-dist/assets/index-DzqJxEUO.js   262.94 kB │ gzip: 76.95 kB
+dist/index.html                   2.17 kB │ gzip:  1.03 kB
+dist/assets/index-BlCF18we.css   27.76 kB │ gzip:  5.43 kB
+dist/assets/index-CUhC0c3P.js   274.81 kB │ gzip: 79.01 kB
 ```
-- **Total Compressed Size:** ~82.32 kB (gzipped)
+- **Total Compressed Size:** ~85.47 kB (gzipped)
 
 ---
 
@@ -617,7 +701,8 @@ dist/assets/index-DzqJxEUO.js   262.94 kB │ gzip: 76.95 kB
 
 | Module | Status | Verification Method |
 | :--- | :---: | :--- |
-| **Drawing Tools (11 Tools)** | **Implemented** | Automated tool lifecycle & regression tests (204 tests) |
+| **Drawing Tools (11 Tools)** | **Implemented** | Automated tool lifecycle & regression tests (236 tests) |
+| **Light & Dark Theme System** | **Implemented** | 32-test suite: Light/Dark/System, persistence, listeners, canvas protection |
 | **Image Upload & Manipulation** | **Implemented** | 59-test suite: formats, sanitization, IndexedDB, transforms, export |
 | **Selection & 8-Point Resizing**| **Implemented** | Automated geometry & handle hit-testing suites |
 | **Canvas Viewport (Pan/Zoom)** | **Implemented** | Sub-pixel coordinate transformation math tests |
@@ -678,7 +763,7 @@ npm run dev
 - Supports instant Hot Module Replacement (HMR).
 
 ### 10.4 Running Tests
-Run the comprehensive 204-test automated verification suite:
+Run the comprehensive 236-test automated verification suite:
 ```bash
 npm test
 ```

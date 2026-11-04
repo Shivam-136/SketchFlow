@@ -48,13 +48,13 @@ export function BottomBar({ canvasContainerRef }) {
   return (
     <footer className="fixed bottom-3 left-4 right-4 z-40 flex items-center justify-between pointer-events-none select-none">
       {/* Bottom Left: Zoom & View controls */}
-      <div className="flex items-center gap-1 bg-white/90 backdrop-blur-md px-2 py-1.5 rounded-2xl shadow-sketch border border-zinc-200/80 pointer-events-auto">
+      <div className="flex items-center gap-1 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md px-2 py-1.5 rounded-2xl shadow-sketch border border-zinc-200/80 dark:border-zinc-800 pointer-events-auto transition-colors duration-200">
         <Tooltip text="Zoom Out" shortcut="Ctrl -" position="top">
           <button
             type="button"
             onClick={zoomOut}
             aria-label="Zoom out"
-            className="p-1.5 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 rounded-lg transition-colors"
+            className="p-1.5 text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
           >
             <ZoomOut className="w-4 h-4" />
           </button>
@@ -65,7 +65,7 @@ export function BottomBar({ canvasContainerRef }) {
             type="button"
             onClick={resetZoom}
             aria-label="Reset zoom"
-            className="px-2 py-1 text-xs font-mono font-medium text-zinc-700 hover:text-zinc-900 hover:bg-zinc-100 rounded-lg transition-colors min-w-[3rem] text-center"
+            className="px-2 py-1 text-xs font-mono font-medium text-zinc-700 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors min-w-[3rem] text-center"
           >
             {Math.round(zoom * 100)}%
           </button>
@@ -76,20 +76,20 @@ export function BottomBar({ canvasContainerRef }) {
             type="button"
             onClick={zoomIn}
             aria-label="Zoom in"
-            className="p-1.5 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 rounded-lg transition-colors"
+            className="p-1.5 text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
           >
             <ZoomIn className="w-4 h-4" />
           </button>
         </Tooltip>
 
-        <div className="w-[1px] h-4 bg-zinc-200 mx-1" />
+        <div className="w-[1px] h-4 bg-zinc-200 dark:bg-zinc-800 mx-1" />
 
         <Tooltip text="Center Canvas" position="top">
           <button
             type="button"
             onClick={centerCanvas}
             aria-label="Center canvas"
-            className="p-1.5 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 rounded-lg transition-colors"
+            className="p-1.5 text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
           >
             <Crosshair className="w-4 h-4" />
           </button>
@@ -100,7 +100,7 @@ export function BottomBar({ canvasContainerRef }) {
             type="button"
             onClick={handleFitToScreen}
             aria-label="Fit to screen"
-            className="p-1.5 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 rounded-lg transition-colors"
+            className="p-1.5 text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
           >
             <Maximize2 className="w-4 h-4" />
           </button>
@@ -108,7 +108,7 @@ export function BottomBar({ canvasContainerRef }) {
       </div>
 
       {/* Bottom Center: Undo / Redo */}
-      <div className="flex items-center gap-1 bg-white/90 backdrop-blur-md px-2 py-1.5 rounded-2xl shadow-sketch border border-zinc-200/80 pointer-events-auto">
+      <div className="flex items-center gap-1 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md px-2 py-1.5 rounded-2xl shadow-sketch border border-zinc-200/80 dark:border-zinc-800 pointer-events-auto transition-colors duration-200">
         <Tooltip text="Undo" shortcut="Ctrl Z" position="top">
           <button
             type="button"
@@ -117,8 +117,8 @@ export function BottomBar({ canvasContainerRef }) {
             aria-label="Undo"
             className={`p-1.5 rounded-lg transition-colors ${
               canUndo
-                ? 'text-zinc-700 hover:text-zinc-900 hover:bg-zinc-100'
-                : 'text-zinc-300 cursor-not-allowed'
+                ? 'text-zinc-700 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                : 'text-zinc-300 dark:text-zinc-600 cursor-not-allowed'
             }`}
           >
             <Undo2 className="w-4 h-4" />
@@ -133,8 +133,8 @@ export function BottomBar({ canvasContainerRef }) {
             aria-label="Redo"
             className={`p-1.5 rounded-lg transition-colors ${
               canRedo
-                ? 'text-zinc-700 hover:text-zinc-900 hover:bg-zinc-100'
-                : 'text-zinc-300 cursor-not-allowed'
+                ? 'text-zinc-700 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                : 'text-zinc-300 dark:text-zinc-600 cursor-not-allowed'
             }`}
           >
             <Redo2 className="w-4 h-4" />
@@ -143,7 +143,7 @@ export function BottomBar({ canvasContainerRef }) {
       </div>
 
       {/* Bottom Right: Grid mode */}
-      <div className="flex items-center gap-1 bg-white/90 backdrop-blur-md px-2 py-1.5 rounded-2xl shadow-sketch border border-zinc-200/80 pointer-events-auto">
+      <div className="flex items-center gap-1 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md px-2 py-1.5 rounded-2xl shadow-sketch border border-zinc-200/80 dark:border-zinc-800 pointer-events-auto transition-colors duration-200">
         <Tooltip
           text={`Grid: ${gridType.charAt(0).toUpperCase() + gridType.slice(1)} (Click to toggle)`}
           position="top"
@@ -151,9 +151,9 @@ export function BottomBar({ canvasContainerRef }) {
           <button
             type="button"
             onClick={cycleGridType}
-            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100 rounded-lg transition-colors"
+            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
           >
-            <Grid className="w-3.5 h-3.5 text-zinc-500" />
+            <Grid className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
             <span className="capitalize">{gridType}</span>
           </button>
         </Tooltip>

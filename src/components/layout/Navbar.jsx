@@ -14,6 +14,7 @@ import {
 import { useCanvasStore } from '../../store/canvasStore';
 import { exportToPNG, exportToSVG, exportToJSON, importFromJSON } from '../../utils/exportUtils';
 import { Tooltip } from '../common/Tooltip';
+import { ThemeToggle } from './ThemeToggle';
 
 export function Navbar() {
   const elements = useCanvasStore((s) => s.elements);
@@ -67,26 +68,26 @@ export function Navbar() {
   return (
     <header className="fixed top-3 left-4 right-4 z-40 flex items-center justify-between pointer-events-none">
       {/* Brand logo & title */}
-      <div className="flex items-center gap-2.5 bg-white/90 backdrop-blur-md px-3.5 py-2 rounded-2xl shadow-sketch border border-zinc-200/80 pointer-events-auto">
+      <div className="flex items-center gap-2.5 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md px-3.5 py-2 rounded-2xl shadow-sketch border border-zinc-200/80 dark:border-zinc-800 pointer-events-auto transition-colors duration-200">
         <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-500 flex items-center justify-center text-white shadow-sm">
           <PenTool className="w-4 h-4 transform -rotate-45" />
         </div>
         <div className="flex flex-col">
           <div className="flex items-center gap-1.5">
-            <span className="font-bold text-zinc-900 tracking-tight text-sm">SketchFlow</span>
-            <span className="text-[10px] uppercase font-semibold tracking-wider text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded-full border border-indigo-100">
+            <span className="font-bold text-zinc-900 dark:text-zinc-100 tracking-tight text-sm">SketchFlow</span>
+            <span className="text-[10px] uppercase font-semibold tracking-wider text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-1.5 py-0.5 rounded-full border border-indigo-100 dark:border-indigo-900/60">
               Whiteboard
             </span>
           </div>
-          <div className="flex items-center gap-1 text-[11px] text-zinc-400">
+          <div className="flex items-center gap-1 text-[11px] text-zinc-400 dark:text-zinc-500">
             <CheckCircle2 className="w-3 h-3 text-emerald-500" />
             <span>Auto-saved locally</span>
           </div>
         </div>
       </div>
 
-      {/* Top right actions: Import, Export, Clear, Shortcuts */}
-      <div className="flex items-center gap-2 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-2xl shadow-sketch border border-zinc-200/80 pointer-events-auto">
+      {/* Top right actions: Import, Export, Clear, Theme, Shortcuts */}
+      <div className="flex items-center gap-2 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md px-3 py-1.5 rounded-2xl shadow-sketch border border-zinc-200/80 dark:border-zinc-800 pointer-events-auto transition-colors duration-200">
         {/* Hidden file input for JSON import */}
         <input
           ref={fileInputRef}
@@ -100,9 +101,9 @@ export function Navbar() {
           <button
             type="button"
             onClick={handleImportClick}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:text-zinc-900 hover:bg-zinc-100/80 rounded-lg transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100/80 dark:hover:bg-zinc-800/80 rounded-lg transition-colors"
           >
-            <Upload className="w-3.5 h-3.5 text-zinc-500" />
+            <Upload className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
             <span>Import</span>
           </button>
         </Tooltip>
@@ -112,9 +113,9 @@ export function Navbar() {
           <button
             type="button"
             onClick={() => setIsExportOpen(!isExportOpen)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:text-zinc-900 hover:bg-zinc-100/80 rounded-lg transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100/80 dark:hover:bg-zinc-800/80 rounded-lg transition-colors"
           >
-            <Download className="w-3.5 h-3.5 text-zinc-500" />
+            <Download className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
             <span>Export</span>
             <ChevronDown className="w-3 h-3 text-zinc-400" />
           </button>
@@ -125,38 +126,38 @@ export function Navbar() {
                 className="fixed inset-0 z-40"
                 onClick={() => setIsExportOpen(false)}
               />
-              <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-sketch-lg border border-zinc-200/80 py-1.5 z-50 animate-in fade-in zoom-in-95">
+              <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-zinc-900 rounded-xl shadow-sketch-lg border border-zinc-200/80 dark:border-zinc-800 py-1.5 z-50 animate-in fade-in zoom-in-95">
                 <button
                   type="button"
                   onClick={handleExportPNG}
-                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-zinc-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors text-left"
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-zinc-700 dark:text-zinc-200 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors text-left"
                 >
                   <FileImage className="w-4 h-4 text-indigo-500" />
                   <div>
                     <div className="font-medium">Export as PNG</div>
-                    <div className="text-[10px] text-zinc-400">High-resolution image</div>
+                    <div className="text-[10px] text-zinc-400 dark:text-zinc-500">High-resolution image</div>
                   </div>
                 </button>
                 <button
                   type="button"
                   onClick={handleExportSVG}
-                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-zinc-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors text-left"
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-zinc-700 dark:text-zinc-200 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors text-left"
                 >
                   <Code2 className="w-4 h-4 text-emerald-500" />
                   <div>
                     <div className="font-medium">Export as SVG</div>
-                    <div className="text-[10px] text-zinc-400">Scalable vector graphic</div>
+                    <div className="text-[10px] text-zinc-400 dark:text-zinc-500">Scalable vector graphic</div>
                   </div>
                 </button>
                 <button
                   type="button"
                   onClick={handleExportJSON}
-                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-zinc-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors text-left"
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-zinc-700 dark:text-zinc-200 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors text-left"
                 >
                   <FileJson className="w-4 h-4 text-amber-500" />
                   <div>
                     <div className="font-medium">Export as JSON</div>
-                    <div className="text-[10px] text-zinc-400">SketchFlow project file</div>
+                    <div className="text-[10px] text-zinc-400 dark:text-zinc-500">SketchFlow project file</div>
                   </div>
                 </button>
               </div>
@@ -164,24 +165,29 @@ export function Navbar() {
           )}
         </div>
 
-        <div className="w-[1px] h-4 bg-zinc-200 my-auto" />
+        <div className="w-[1px] h-4 bg-zinc-200 dark:bg-zinc-800 my-auto" />
 
         <Tooltip text="Clear Canvas" position="bottom">
           <button
             type="button"
             onClick={() => setShowClearModal(true)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors"
           >
             <Trash2 className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Clear</span>
           </button>
         </Tooltip>
 
+        <div className="w-[1px] h-4 bg-zinc-200 dark:bg-zinc-800 my-auto" />
+
+        {/* Theme Switching Toggle */}
+        <ThemeToggle />
+
         <Tooltip text="Keyboard Shortcuts (?)" position="bottom">
           <button
             type="button"
             onClick={() => setShowShortcutsModal(true)}
-            className="p-1.5 text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100/80 rounded-lg transition-colors"
+            className="p-1.5 text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-100 hover:bg-zinc-100/80 dark:hover:bg-zinc-800/80 rounded-lg transition-colors"
             aria-label="Help and shortcuts"
           >
             <HelpCircle className="w-4 h-4" />

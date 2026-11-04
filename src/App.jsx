@@ -15,7 +15,7 @@ export default function App() {
   const containerRef = useRef(null);
 
   return (
-    <div ref={containerRef} className="relative w-screen h-screen overflow-hidden select-none bg-[#fbfbfa]">
+    <div ref={containerRef} className="relative w-screen h-screen overflow-hidden select-none bg-[#fbfbfa] dark:bg-[#121212] text-zinc-800 dark:text-zinc-100 transition-colors duration-200">
       {/* Top Navbar */}
       <Navbar />
 

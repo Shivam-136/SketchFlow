@@ -4,6 +4,30 @@
 
 :root {
   color-scheme: light;
+  --sketch-bg: #fbfbfa;
+  --sketch-canvas-bg: #fbfbfa;
+  --sketch-panel: #ffffff;
+  --sketch-border: #e4e4e7;
+  --sketch-text: #18181b;
+  --sketch-text-muted: #71717a;
+  --sketch-grid-dots: #d4d4d8;
+  --sketch-grid-lines: #e4e4e7;
+  --sketch-scrollbar-thumb: rgba(0, 0, 0, 0.15);
+  --sketch-scrollbar-thumb-hover: rgba(0, 0, 0, 0.25);
+}
+
+.dark {
+  color-scheme: dark;
+  --sketch-bg: #121212;
+  --sketch-canvas-bg: #121212;
+  --sketch-panel: #1e1e1e;
+  --sketch-border: #27272a;
+  --sketch-text: #f4f4f5;
+  --sketch-text-muted: #a1a1aa;
+  --sketch-grid-dots: #3f3f46;
+  --sketch-grid-lines: #27272a;
+  --sketch-scrollbar-thumb: rgba(255, 255, 255, 0.2);
+  --sketch-scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 body {
@@ -15,7 +39,9 @@ body {
   user-select: none;
   -webkit-user-select: none;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background-color: #fbfbfa;
+  background-color: var(--sketch-bg);
+  color: var(--sketch-text);
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 /* Custom scrollbars */
@@ -27,11 +53,11 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.15);
+  background: var(--sketch-scrollbar-thumb);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.25);
+  background: var(--sketch-scrollbar-thumb-hover);
 }
 
 /* Canvas cursor styling */

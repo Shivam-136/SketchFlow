@@ -19,7 +19,7 @@ export function canvasToScreen(canvasX, canvasY, panOffset, zoom) {
 /**
  * Draws the canvas background grid (dots or lines)
  */
-export function drawGrid(ctx, width, height, panOffset, zoom, gridType = 'dots') {
+export function drawGrid(ctx, width, height, panOffset, zoom, gridType = 'dots', isDark = false) {
   if (gridType === 'none') return;
 
   const baseGridSize = 24;
@@ -35,7 +35,7 @@ export function drawGrid(ctx, width, height, panOffset, zoom, gridType = 'dots')
   ctx.save();
 
   if (gridType === 'dots') {
-    ctx.fillStyle = '#d4d4d8';
+    ctx.fillStyle = isDark ? '#3f3f46' : '#d4d4d8';
     const dotRadius = Math.max(1, Math.min(1.5, 1.2 * (zoom >= 1 ? 1 : zoom)));
 
     for (let x = startX - gridSize; x < width + gridSize; x += gridSize) {
@@ -46,7 +46,7 @@ export function drawGrid(ctx, width, height, panOffset, zoom, gridType = 'dots')
       }
     }
   } else if (gridType === 'lines') {
-    ctx.strokeStyle = '#e4e4e7';
+    ctx.strokeStyle = isDark ? '#27272a' : '#e4e4e7';
     ctx.lineWidth = 1;
     ctx.beginPath();
 

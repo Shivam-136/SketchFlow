@@ -95,7 +95,7 @@ export function Toolbar() {
       />
       <nav
         aria-label="Drawing Tools"
-        className="flex items-center gap-1 bg-white/95 backdrop-blur-md px-2 py-1.5 rounded-2xl shadow-sketch border border-zinc-200/80"
+        className="flex items-center gap-1 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md px-2 py-1.5 rounded-2xl shadow-sketch border border-zinc-200/80 dark:border-zinc-800 transition-colors duration-200"
       >
         {TOOLS.map((tool) => (
           <IconButton

@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useCanvasStore } from '../../store/canvasStore.js';
+import { useThemeStore } from '../../store/themeStore.js';
 import { DrawingEngine } from './DrawingEngine.js';
 import { renderElementOnContext, renderSelectionBox, renderMarquee } from './CanvasRenderer.js';
 import { screenToCanvas, canvasToScreen, drawGrid, measureText, generateId } from '../../utils/canvasUtils.js';
@@ -29,6 +30,9 @@ export function Whiteboard() {
   const updateElement = useCanvasStore((s) => s.updateElement);
   const deleteElement = useCanvasStore((s) => s.deleteElement);
   const setSelectedIds = useCanvasStore((s) => s.setSelectedIds);
+
+  // Theme binding
+  const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
 
   // Engine instance
   const engineRef = useRef(null);
@@ -89,12 +93,13 @@ export function Whiteboard() {
     ctx.save();
     ctx.scale(dpr, dpr);
 
-    // 1. Clear background
-    ctx.fillStyle = '#fbfbfa';
+    // 1. Clear background according to active theme
+    const isDark = resolvedTheme === 'dark';
+    ctx.fillStyle = isDark ? '#121212' : '#fbfbfa';
     ctx.fillRect(0, 0, width, height);
 
     // 2. Draw subtle background grid
-    drawGrid(ctx, width, height, panOffset, zoom, gridType);
+    drawGrid(ctx, width, height, panOffset, zoom, gridType, isDark);
 
     // 3. Viewport transform
     ctx.save();
@@ -127,7 +132,7 @@ export function Whiteboard() {
 
     ctx.restore();
     ctx.restore();
-  }, [dimensions, elements, selectedIds, activeTool, panOffset, zoom, gridType, editingText]);
+  }, [dimensions, elements, selectedIds, activeTool, panOffset, zoom, gridType, editingText, resolvedTheme]);
 
   // Re-render whenever dependencies change
   useEffect(() => {
@@ -614,7 +619,7 @@ export function Whiteboard() {
               }
             }}
             placeholder="Type text..."
-            className="outline-none border-2 border-indigo-500 bg-white/95 rounded-lg shadow-xl resize-none p-1.5 overflow-hidden whitespace-pre font-sans select-text"
+            className="outline-none border-2 border-indigo-500 bg-white/95 dark:bg-zinc-900/95 rounded-lg shadow-xl resize-none p-1.5 overflow-hidden whitespace-pre font-sans select-text"
             style={{
               fontSize: `${(editingText.fontSize || 24) * zoom}px`,
               fontFamily: editingText.fontFamily || 'Caveat, cursive',
@@ -626,7 +631,7 @@ export function Whiteboard() {
             }}
             rows={Math.max(1, (editingText.text.split('\n').length || 1))}
           />
-          <div className="flex items-center gap-2 text-[10px] text-zinc-600 bg-white/95 px-2 py-0.5 rounded shadow mt-1 border border-zinc-200 pointer-events-none select-none">
+          <div className="flex items-center gap-2 text-[10px] text-zinc-600 dark:text-zinc-300 bg-white/95 dark:bg-zinc-900/95 px-2 py-0.5 rounded shadow mt-1 border border-zinc-200 dark:border-zinc-800 pointer-events-none select-none">
             <span><strong>Enter</strong>: new line</span>
             <span>•</span>
             <span><strong>Ctrl+Enter</strong>: commit</span>

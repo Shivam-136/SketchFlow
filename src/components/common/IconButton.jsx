@@ -29,16 +29,16 @@ export function IconButton({
         ${sizeClasses}
         ${
           isActive
-            ? 'bg-indigo-100 text-indigo-700 shadow-sm border border-indigo-200 font-medium'
-            : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/80 active:bg-zinc-200/80'
+            ? 'bg-indigo-100 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 shadow-sm border border-indigo-200 dark:border-indigo-800 font-medium'
+            : 'text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100/80 dark:hover:bg-zinc-800/80 active:bg-zinc-200/80 dark:active:bg-zinc-700/80'
         }
-        ${disabled ? 'opacity-40 cursor-not-allowed hover:bg-transparent hover:text-zinc-600' : 'cursor-pointer'}
+        ${disabled ? 'opacity-40 cursor-not-allowed hover:bg-transparent text-zinc-400 dark:text-zinc-600' : 'cursor-pointer'}
         ${className}
       `}
     >
       <Icon className="w-full h-full" strokeWidth={isActive ? 2.2 : 1.8} />
       {shortcut && (
-        <span className="absolute bottom-0.5 right-1 text-[9px] font-mono text-zinc-400 pointer-events-none opacity-80">
+        <span className="absolute bottom-0.5 right-1 text-[9px] font-mono text-zinc-400 dark:text-zinc-500 pointer-events-none opacity-80">
           {shortcut}
         </span>
       )}
