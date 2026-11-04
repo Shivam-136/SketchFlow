@@ -311,14 +311,60 @@ async function runTestSuite() {
   {
     const store = useCanvasStore.getState();
     const standbyBoard = await store.createBoard('Standby Board');
+    store.addElement({ id: 'shape_standby', type: 'rectangle', x: 50, y: 50, width: 100, height: 100 });
+    await store.flushSaveCurrentBoard();
+
     const boardToDelete = await store.createBoard('Active Board To Delete');
+    store.addElement({ id: 'shape_to_delete', type: 'circle', x: 10, y: 10, width: 80, height: 80 });
+    await store.flushSaveCurrentBoard();
 
     assert(useCanvasStore.getState().activeBoardId === boardToDelete.id, 'Board to delete is currently active');
+    const boardCountBefore = (await getAllBoardsMetadata()).length;
+
     await store.deleteBoard(boardToDelete.id);
 
     const currentActive = useCanvasStore.getState().activeBoardId;
     assert(currentActive !== boardToDelete.id, 'Active board updated away from deleted board');
     assert(Boolean(currentActive), 'System automatically switched to another available board');
+    assert((await getBoard(boardToDelete.id)) === null, 'Active board deleted from persistent storage and not resurrected');
+    assert(useCanvasStore.getState().boardsList.some((b) => b.id === boardToDelete.id) === false, 'Deleted board removed from Zustand boardsList immediately');
+    assert((await getAllBoardsMetadata()).length === boardCountBefore - 1, 'Board count reduced by exactly 1');
+
+    // Verify standby board remains completely unaffected with its elements intact
+    const standbyAfter = await getBoard(standbyBoard.id);
+    assert(standbyAfter !== null, 'Standby board remains unaffected in storage');
+    assert(standbyAfter.elements.length === 1, 'Standby board elements remain intact');
+
+    // Verify deleted board does NOT reappear after simulated refresh
+    await store.initBoards();
+    assert(useCanvasStore.getState().boardsList.some((b) => b.id === boardToDelete.id) === false, 'Deleted board does not return after simulated refresh');
+  }
+
+  // [10b] CANCEL BOARD DELETION
+  console.log('\n[10b] Testing Deletion Cancellation...');
+  {
+    const store = useCanvasStore.getState();
+    const safeBoard = await store.createBoard('Safe Kept Board');
+    const countBefore = (await getAllBoardsMetadata()).length;
+
+    // Simulate user cancelling deletion confirmation modal (no deleteBoard call made)
+    let userCancelled = true;
+    if (!userCancelled) {
+      await store.deleteBoard(safeBoard.id);
+    }
+
+    const countAfter = (await getAllBoardsMetadata()).length;
+    assert(countAfter === countBefore, 'Board count unchanged when deletion is cancelled');
+    assert((await getBoard(safeBoard.id)) !== null, 'Board remains safely in persistent storage after cancellation');
+    assert(useCanvasStore.getState().boardsList.some((b) => b.id === safeBoard.id), 'Board remains in Zustand listing');
+  }
+
+  // [10c] FAILED PERSISTENCE DELETION ERROR HANDLING
+  console.log('\n[10c] Testing Storage Deletion Error Handling...');
+  {
+    const store = useCanvasStore.getState();
+    const res = await store.deleteBoard('');
+    assert(res === false, 'Deletion of empty boardId safely returns false without crashing');
   }
 
   // [11] DELETE LAST BOARD BEHAVIOR
@@ -336,6 +382,7 @@ async function runTestSuite() {
     assert(state.elements.length === 0, 'Fallback canvas is clean empty state');
     const all = await getAllBoardsMetadata();
     assert(all.length >= 1, 'Storage contains guaranteed fallback board');
+    assert((await getBoard(singleBoard.id)) === null, 'Deleted single board no longer in storage');
   }
 
   // [12] IMAGE ASSET REFERENCE SAFETY

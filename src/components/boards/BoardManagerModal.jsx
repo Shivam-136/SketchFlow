@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   LayoutGrid,
   Plus,
@@ -32,7 +33,9 @@ export function BoardManagerModal() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('updated-desc'); // 'updated-desc' | 'created-desc' | 'created-asc' | 'name-asc' | 'name-desc' | 'elements-desc'
-  const [activeMenuId, setActiveMenuId] = useState(null);
+
+  // Three-dot popover menu state: { board, position: { top, bottom, right, openUpwards } }
+  const [menuState, setMenuState] = useState(null);
 
   // Rename Dialog state
   const [renamingBoard, setRenamingBoard] = useState(null);
@@ -43,14 +46,47 @@ export function BoardManagerModal() {
   const [deletingBoard, setDeletingBoard] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Notification Toast state: { type: 'success' | 'error', message: string } | null
+  const [toast, setToast] = useState(null);
+
+  // Auto-dismiss toast notification
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 3500);
+    return () => clearTimeout(timer);
+  }, [toast]);
+
   // Refresh boards list whenever modal opens
   useEffect(() => {
     if (show) {
       refreshBoardsList();
       setSearchQuery('');
-      setActiveMenuId(null);
+      setMenuState(null);
     }
   }, [show, refreshBoardsList]);
+
+  // Global Escape key listener
+  useEffect(() => {
+    if (!show) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        if (menuState) {
+          e.stopPropagation();
+          setMenuState(null);
+        } else if (renamingBoard) {
+          e.stopPropagation();
+          setRenamingBoard(null);
+        } else if (deletingBoard) {
+          e.stopPropagation();
+          setDeletingBoard(null);
+        } else {
+          setShow(false);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [show, menuState, renamingBoard, deletingBoard, setShow]);
 
   // Filter and sort boards
   const filteredAndSortedBoards = useMemo(() => {
@@ -97,9 +133,30 @@ export function BoardManagerModal() {
     setShow(false);
   };
 
+  const handleOpenMenu = (board, e) => {
+    e.stopPropagation();
+    if (menuState?.board?.id === board.id) {
+      setMenuState(null);
+      return;
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    const menuHeight = 160;
+    const openUpwards = typeof window !== 'undefined' && rect.bottom + menuHeight > window.innerHeight;
+    const right = typeof window !== 'undefined' ? Math.max(12, window.innerWidth - rect.right) : 12;
+    setMenuState({
+      board,
+      position: {
+        top: Math.round(rect.bottom + 6),
+        bottom: typeof window !== 'undefined' ? Math.round(window.innerHeight - rect.top + 6) : 0,
+        right: Math.round(right),
+        openUpwards
+      }
+    });
+  };
+
   const handleStartRename = (board, e) => {
     e?.stopPropagation();
-    setActiveMenuId(null);
+    setMenuState(null);
     setRenamingBoard(board);
     setRenameValue(board.name || '');
     setRenameError('');
@@ -125,24 +182,33 @@ export function BoardManagerModal() {
 
   const handleDuplicate = async (boardId, e) => {
     e?.stopPropagation();
-    setActiveMenuId(null);
+    setMenuState(null);
     await duplicateBoard(boardId);
   };
 
   const handleStartDelete = (board, e) => {
     e?.stopPropagation();
-    setActiveMenuId(null);
+    setMenuState(null);
     setDeletingBoard(board);
   };
 
   const handleConfirmDelete = async () => {
     if (!deletingBoard) return;
+    const boardToDelete = deletingBoard;
     setIsDeleting(true);
     try {
-      await deleteBoard(deletingBoard.id);
+      await deleteBoard(boardToDelete.id);
+      setToast({
+        type: 'success',
+        message: `Whiteboard "${boardToDelete.name || 'Untitled Board'}" was deleted.`
+      });
       setDeletingBoard(null);
     } catch (err) {
-      console.warn('Failed to delete board:', err);
+      console.error('Failed to delete board:', err);
+      setToast({
+        type: 'error',
+        message: err.message || 'Failed to delete whiteboard from storage.'
+      });
     } finally {
       setIsDeleting(false);
     }
@@ -173,7 +239,7 @@ export function BoardManagerModal() {
       <div
         className="fixed inset-0"
         onClick={() => {
-          setActiveMenuId(null);
+          setMenuState(null);
           setShow(false);
         }}
       />
@@ -181,7 +247,7 @@ export function BoardManagerModal() {
       {/* Main Dialog Container */}
       <div
         className="relative w-full max-w-4xl max-h-[88vh] bg-white dark:bg-zinc-900 rounded-3xl shadow-sketch-lg border border-zinc-200 dark:border-zinc-800 flex flex-col z-10 overflow-hidden text-zinc-800 dark:text-zinc-100 transition-colors duration-200"
-        onClick={() => setActiveMenuId(null)}
+        onClick={() => setMenuState(null)}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 flex-shrink-0">
@@ -299,7 +365,7 @@ export function BoardManagerModal() {
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               {filteredAndSortedBoards.map((board) => {
                 const isActive = board.id === activeBoardId;
-                const isMenuOpen = activeMenuId === board.id;
+                const isMenuOpen = menuState?.board?.id === board.id;
 
                 return (
                   <div
@@ -356,57 +422,17 @@ export function BoardManagerModal() {
                         <div className="relative">
                           <button
                             type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setActiveMenuId(isMenuOpen ? null : board.id);
-                            }}
-                            className="p-1 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
-                            aria-label="Board options"
+                            onClick={(e) => handleOpenMenu(board, e)}
+                            className={`p-1.5 rounded-lg transition-colors ${
+                              isMenuOpen
+                                ? 'bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 ring-1 ring-zinc-300 dark:ring-zinc-600'
+                                : 'text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                            }`}
+                            aria-label={`Options for ${board.name || 'board'}`}
+                            title="Board actions"
                           >
                             <MoreVertical className="w-4 h-4" />
                           </button>
-
-                          {/* Action Popover Menu */}
-                          {isMenuOpen && (
-                            <div
-                              className="absolute right-0 bottom-full sm:bottom-auto sm:top-full mb-1 sm:mt-1 w-36 bg-white dark:bg-zinc-800 rounded-xl shadow-sketch-lg border border-zinc-200/80 dark:border-zinc-700 py-1 z-30 animate-in fade-in zoom-in-95"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <button
-                                type="button"
-                                onClick={() => handleOpenBoard(board.id)}
-                                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700/60 transition-colors text-left font-medium"
-                              >
-                                <ExternalLink className="w-3.5 h-3.5 text-zinc-500" />
-                                <span>Open</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => handleStartRename(board, e)}
-                                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700/60 transition-colors text-left font-medium"
-                              >
-                                <Edit3 className="w-3.5 h-3.5 text-zinc-500" />
-                                <span>Rename</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => handleDuplicate(board.id, e)}
-                                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700/60 transition-colors text-left font-medium"
-                              >
-                                <Copy className="w-3.5 h-3.5 text-zinc-500" />
-                                <span>Duplicate</span>
-                              </button>
-                              <div className="h-[1px] bg-zinc-100 dark:bg-zinc-700 my-1" />
-                              <button
-                                type="button"
-                                onClick={(e) => handleStartDelete(board, e)}
-                                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-colors text-left font-medium"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                                <span>Delete</span>
-                              </button>
-                            </div>
-                          )}
                         </div>
                       </div>
 
@@ -443,8 +469,14 @@ export function BoardManagerModal() {
 
       {/* Rename Board Dialog Modal */}
       {renamingBoard && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-zinc-900/50 dark:bg-black/70 backdrop-blur-sm animate-in fade-in">
-          <div className="relative w-full max-w-sm bg-white dark:bg-zinc-900 rounded-2xl shadow-sketch-lg border border-zinc-200 dark:border-zinc-800 p-5 flex flex-col gap-4 animate-in zoom-in-95">
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-zinc-900/50 dark:bg-black/70 backdrop-blur-sm animate-in fade-in"
+          onClick={() => setRenamingBoard(null)}
+        >
+          <div
+            className="relative w-full max-w-sm bg-white dark:bg-zinc-900 rounded-2xl shadow-sketch-lg border border-zinc-200 dark:border-zinc-800 p-5 flex flex-col gap-4 animate-in zoom-in-95"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Rename Whiteboard</h3>
               <button
@@ -499,8 +531,14 @@ export function BoardManagerModal() {
 
       {/* Delete Confirmation Modal */}
       {deletingBoard && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-zinc-900/50 dark:bg-black/70 backdrop-blur-sm animate-in fade-in">
-          <div className="relative w-full max-w-sm bg-white dark:bg-zinc-900 rounded-2xl shadow-sketch-lg border border-zinc-200 dark:border-zinc-800 p-5 flex flex-col gap-4 animate-in zoom-in-95">
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-zinc-900/50 dark:bg-black/70 backdrop-blur-sm animate-in fade-in"
+          onClick={() => !isDeleting && setDeletingBoard(null)}
+        >
+          <div
+            className="relative w-full max-w-sm bg-white dark:bg-zinc-900 rounded-2xl shadow-sketch-lg border border-zinc-200 dark:border-zinc-800 p-5 flex flex-col gap-4 animate-in zoom-in-95"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-100 dark:border-rose-900/60 flex items-center justify-center text-rose-600 dark:text-rose-400 flex-shrink-0">
                 <AlertTriangle className="w-5 h-5" />
@@ -519,7 +557,7 @@ export function BoardManagerModal() {
                 type="button"
                 disabled={isDeleting}
                 onClick={() => setDeletingBoard(null)}
-                className="px-3.5 py-1.5 text-xs font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors"
+                className="px-3.5 py-1.5 text-xs font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -527,13 +565,131 @@ export function BoardManagerModal() {
                 type="button"
                 disabled={isDeleting}
                 onClick={handleConfirmDelete}
-                className="px-4 py-1.5 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 active:scale-95 rounded-xl transition-all shadow-sm"
+                className="px-4 py-1.5 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 active:scale-95 rounded-xl transition-all shadow-sm disabled:opacity-50"
               >
-                {isDeleting ? 'Deleting...' : 'Yes, Delete Board'}
+                {isDeleting ? 'Deleting...' : 'Delete Board'}
               </button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Toast Notification */}
+      {toast && (
+        <div
+          role="status"
+          aria-live="polite"
+          className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[150] flex items-center gap-2.5 px-4 py-2.5 rounded-2xl shadow-sketch-lg border text-xs font-semibold animate-in fade-in slide-in-from-bottom-2 duration-200 select-none ${
+            toast.type === 'error'
+              ? 'bg-rose-50 dark:bg-rose-950/95 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800'
+              : 'bg-zinc-900/95 dark:bg-white text-white dark:text-zinc-900 border-zinc-800 dark:border-zinc-200'
+          }`}
+        >
+          {toast.type === 'error' ? (
+            <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0" />
+          ) : (
+            <Check className="w-4 h-4 text-emerald-400 dark:text-emerald-600 shrink-0" />
+          )}
+          <span>{toast.message}</span>
+          <button
+            type="button"
+            onClick={() => setToast(null)}
+            className="ml-2 p-0.5 rounded-md hover:opacity-70 transition-opacity"
+            aria-label="Dismiss notification"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* Three-Dot Actions Dropdown Menu (Portaled to document.body to prevent clipping by overflow-hidden & stacking context) */}
+      {menuState && typeof document !== 'undefined' && document.body && createPortal(
+        <>
+          {/* Fullscreen transparent backdrop for outside clicks */}
+          <div
+            className="fixed inset-0 z-[100]"
+            onClick={(e) => {
+              e.stopPropagation();
+              setMenuState(null);
+            }}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setMenuState(null);
+            }}
+          />
+
+          {/* Floating actions menu */}
+          <div
+            style={{
+              position: 'fixed',
+              top: menuState.position.openUpwards ? undefined : `${menuState.position.top}px`,
+              bottom: menuState.position.openUpwards ? `${menuState.position.bottom}px` : undefined,
+              right: `${menuState.position.right}px`
+            }}
+            className="w-40 bg-white dark:bg-zinc-800 rounded-xl shadow-sketch-lg border border-zinc-200/90 dark:border-zinc-700 py-1.5 z-[101] animate-in fade-in zoom-in-95 text-zinc-800 dark:text-zinc-100 select-none"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* 1. Open */}
+            <button
+              type="button"
+              onClick={() => {
+                const id = menuState.board.id;
+                setMenuState(null);
+                handleOpenBoard(id);
+              }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700/70 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors text-left font-medium"
+            >
+              <ExternalLink className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
+              <span>Open</span>
+            </button>
+
+            {/* 2. Rename */}
+            <button
+              type="button"
+              onClick={(e) => {
+                const b = menuState.board;
+                setMenuState(null);
+                handleStartRename(b, e);
+              }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700/70 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors text-left font-medium"
+            >
+              <Edit3 className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
+              <span>Rename</span>
+            </button>
+
+            {/* 3. Duplicate */}
+            <button
+              type="button"
+              onClick={(e) => {
+                const id = menuState.board.id;
+                setMenuState(null);
+                handleDuplicate(id, e);
+              }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700/70 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors text-left font-medium"
+            >
+              <Copy className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
+              <span>Duplicate</span>
+            </button>
+
+            <div className="h-[1px] bg-zinc-100 dark:bg-zinc-700/80 my-1" />
+
+            {/* 4. Delete */}
+            <button
+              type="button"
+              onClick={(e) => {
+                const b = menuState.board;
+                setMenuState(null);
+                handleStartDelete(b, e);
+              }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-colors text-left font-medium"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+              <span>Delete</span>
+            </button>
+          </div>
+        </>,
+        document.body
       )}
     </div>
   );

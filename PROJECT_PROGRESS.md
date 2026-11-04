@@ -1,6 +1,6 @@
 # SketchFlow — Project Documentation & Engineering Progress
 
-**Document Version:** 1.3.0  
+**Document Version:** 1.3.1  
 **Last Updated:** November 2026  
 **Project Name:** SketchFlow  
 **Project Type:** Excalidraw-inspired Online Whiteboard Application  
@@ -659,6 +659,15 @@ When switching between boards:
 - **Files Created/Modified:** [`src/store/themeStore.js`](file:///c:/Users/ASUS/OneDrive/Desktop/SketchFlow/src/store/themeStore.js), [`src/components/canvas/Whiteboard.jsx`](file:///c:/Users/ASUS/OneDrive/Desktop/SketchFlow/src/components/canvas/Whiteboard.jsx).
 - **Verification Status:** Verified in `tests/themeAudit.mjs` Section 5.
 
+### 4.5 Multiple Boards Interface Fixes
+
+#### Issue 20: Three-Dot Actions Dropdown Clipping in Card Container
+- **Problem:** Clicking the three-dot menu trigger on a board card displayed only the "Open" action. The "Rename", "Duplicate", and "Delete" actions were completely missing or clipped.
+- **Root Cause:** The parent board card element had CSS `overflow: hidden` to maintain rounded thumbnail corners, causing the dropdown menu rendered inside the card content to be clipped beyond the card's boundary. Additionally, the scrollable grid container's `overflow-y-auto` clipped bottom-row menus.
+- **Solution:** Re-architected the three-dot action dropdown using a React Portal (`createPortal`) targeting `document.body`. Dynamically computes trigger geometry via `getBoundingClientRect()`, flips upwards when near the bottom viewport boundary, renders a transparent full-screen backdrop for click-outside dismissal with `stopPropagation()`, binds the global `Escape` key listener, and guarantees that all four options (*Open*, *Rename*, *Duplicate*, *Delete*) are 100% visible across Light and Dark themes without triggering accidental board selection.
+- **Files Modified:** [`src/components/boards/BoardManagerModal.jsx`](file:///c:/Users/ASUS/OneDrive/Desktop/SketchFlow/src/components/boards/BoardManagerModal.jsx).
+- **Verification Status:** Verified in `tests/multipleBoardsAudit.mjs` and Vite production build.
+
 ---
 
 ## 5. File Structure Documentation
@@ -758,10 +767,37 @@ The project includes seven automated test suites run directly via `npm test`:
 | **Text Tool Workflow Audit**| `tests/textToolWorkflowAudit.mjs`| 50 | 50 Passed | Complete 10-step text creation workflow, multiline editing, Escape cancel, double-click in-place editing, persistence, and regression on all drawing tools. |
 | **Image Tool Audit** | `tests/imageToolAudit.mjs` | 59 | 59 Passed | Format validation (PNG, JPG, WebP, SVG), SVG security sanitization (stripping scripts & handlers), 25MB limit, IndexedDB storage, 8-handle resizing with aspect ratio lock, rotation, opacity, multi-selection, undo/redo, 50%–200% zoom, and portable export/import. |
 | **Theme System Audit** | `tests/themeAudit.mjs` | 32 | 32 Passed | Light/Dark/System theme resolution, LocalStorage persistence, DOM attribute synchronization, dynamic OS preference change listener, zero element color mutation, undo/redo history isolation, export invariance, and theme-adaptive grid rendering. |
-| **Multiple Boards Audit** | `tests/multipleBoardsAudit.mjs` | 83 | 83 Passed | Creation, unique IDs, data independence, switching lifecycle, refresh persistence, rename validation, duplicate deep-clone, delete inactive/active/last, image asset safety, orphan cleanup, legacy migration, migration idempotency, undo/redo isolation, viewport isolation, rapid switching race conditions, project export/import, single-board compatibility, Light & Dark modes, search & sorting. |
-| **Total** | | **298** | **298 Passed (0 Failed)** | **100% Automated Test Pass Rate** |
+| **Multiple Boards Audit** | `tests/multipleBoardsAudit.mjs` | 94 | 94 Passed | Creation, unique IDs, data independence, switching lifecycle, refresh persistence, rename validation, duplicate deep-clone, delete inactive/active/last, cancellation handling, deletion error handling, image asset safety, orphan cleanup, legacy migration, migration idempotency, undo/redo isolation, viewport isolation, rapid switching race conditions, project export/import, single-board compatibility, Light & Dark modes, search & sorting. |
+| **Total** | | **309** | **309 Passed (0 Failed)** | **100% Automated Test Pass Rate** |
 
-### 6.2 Test Coverage Highlights
+### 6.2 Board Deletion Flow & IndexedDB Persistence Fix (v1.3.1 Audit)
+
+#### Root Causes Identified
+1. **Active Board Resave via `switchBoard()` Flush:** When an active board was deleted, `deleteBoard(boardId)` in `canvasStore.js` called `switchBoard(targetId)`. Step 1 of `switchBoard` invoked `flushSaveCurrentBoard()`. At that moment `get().activeBoardId` was still set to the deleted board ID, causing `saveBoard(boardRecord)` to immediately recreate and re-save the deleted board back into IndexedDB (`sketchflow_db`) and memory cache. Subsequent `refreshBoardsList()` re-queried IndexedDB and restored the deleted board to state.
+2. **Pending Save Debounce Race Condition:** Any drawing or interaction prior to deletion queued a 400ms debounce timer (`saveDebounceTimer`). If deletion occurred before the timer fired, `debouncedSave` executed `saveBoard()` using `activeBoardId`, resurrecting the board.
+3. **In-Memory Cache Desynchronization:** `boardsMemoryStorage` in `boardStorage.js` retained deleted keys if transactions erred or `getAllBoards()` executed without clearing the in-memory map.
+4. **UI Event Handling & Modal State:** In `BoardManagerModal.jsx`, `setActiveMenuId` triggered a runtime `ReferenceError` on backdrop click; the confirmation modal lacked proper z-index isolation, toast notification feedback, and exact button text matching.
+
+#### Deletion Implementation & Fixes
+- **`src/utils/boardStorage.js`:**
+  - Implemented transactional error handling for IndexedDB deletion requests and transactions.
+  - Cleared and re-synced `boardsMemoryStorage` during `getAllBoards()` to guarantee 1:1 synchronization with IndexedDB.
+  - Transaction failures return `false` preventing optimistic state removal on storage errors.
+- **`src/store/canvasStore.js`:**
+  - Introduced `skipFlush: true` option in `switchBoard()` to skip flushing the current board during active board deletion.
+  - Cleared `saveDebounceTimer` immediately at the start of `deleteBoard()`.
+  - Added safety guards in `debouncedSave` and `flushSaveCurrentBoard` verifying that `activeBoardId` exists in `boardsList` before persisting.
+  - Updated active board deletion to load the replacement board's state, viewport, grid, and cached history cleanly.
+  - Handled last board deletion by generating a fresh default board with clean undo/redo history and synchronized LocalStorage.
+- **`src/components/boards/BoardManagerModal.jsx`:**
+  - Fixed runtime ReferenceError (`setActiveMenuId` -> `setMenuState`).
+  - Implemented Delete Confirmation modal displaying exact board name with "Cancel" and "Delete Board" buttons.
+  - Added interactive feedback toast notification with auto-dismiss (3500ms) for deletion success and error feedback.
+  - Stopped event propagation and prevented backdrop dismiss conflicts.
+- **`tests/multipleBoardsAudit.mjs`:**
+  - Added test cases verifying inactive board deletion, active board deletion without resurrection, last board fallback creation, deletion cancellation, persistence verification after simulated refresh, and storage error handling.
+
+### 6.3 Test Coverage Highlights
 - **Geometry & Math:** Verified Pythagorean distance, rectangle normalization with negative dimensions, group bounding box generation, 4-corner rotated bounds, and segment distance.
 - **Resize Handles & Aspect Ratio:** Verified handle detection on all 8 corners and borders with visual padding compensation; verified aspect ratio preservation during corner drags for images and freeform scaling when unlocked.
 - **Coordinate Inversion & Rotations:** Roundtrip mathematical accuracy verified between `screenToCanvas` and `canvasToScreen` at 50%, 75%, 100%, 150%, and 200% zoom with zero floating-point drift (`delta < 1e-9`); inverse matrix rotation transforms validated for rotated image hit-testing.
@@ -779,7 +815,7 @@ The project includes seven automated test suites run directly via `npm test`:
 
 > [!IMPORTANT]
 > **Automated vs. Manual Browser Verification Notice:**  
-> The 236 automated tests execute in a Node.js simulation environment utilizing headless DOM, Canvas 2D context, IndexedDB, and LocalStorage mocks. While these tests verify mathematical logic, state transitions, event lifecycles, and serialization integrity, they are **automated programmatic tests** and do not replace physical hardware QA on actual touch devices or long-term browser memory leak profiling.
+> The 309 automated tests execute in a Node.js simulation environment utilizing headless DOM, Canvas 2D context, IndexedDB, and LocalStorage mocks. While these tests verify mathematical logic, state transitions, event lifecycles, and serialization integrity, they are **automated programmatic tests** and do not replace physical hardware QA on actual touch devices or long-term browser memory leak profiling.
 
 ---
 
@@ -790,16 +826,16 @@ The production build is executed using Vite and compiles the application into op
 - **Build Command:** `npm run build`
 - **Bundler Version:** Vite v5.4.21
 - **Target:** ECMAScript Modern Browsers (`esbuild`)
-- **Compilation Time:** ~13.5 seconds
+- **Compilation Time:** ~19.8 seconds
 - **Exit Code:** 0 (Clean build, zero warnings or errors)
 
 ### Build Output & Asset Sizes
 ```
 dist/index.html                   2.17 kB │ gzip:  1.03 kB
-dist/assets/index-CZWB9CqE.css   33.84 kB │ gzip:  6.18 kB
-dist/assets/index-ByPl086x.js   314.31 kB │ gzip: 87.41 kB
+dist/assets/index-CzAp9Yhw.css   35.30 kB │ gzip:  6.40 kB
+dist/assets/index-DSvFwqsf.js   318.01 kB │ gzip: 88.37 kB
 ```
-- **Total Compressed Size:** ~94.62 kB (gzipped)
+- **Total Compressed Size:** ~95.80 kB (gzipped)
 
 ---
 
@@ -807,7 +843,7 @@ dist/assets/index-ByPl086x.js   314.31 kB │ gzip: 87.41 kB
 
 | Module | Status | Verification Method |
 | :--- | :---: | :--- |
-| **Multiple Boards Management** | **Implemented** | 83-test suite: creation, isolation, switching, duplicate, delete, image safety, migration, project I/O |
+| **Multiple Boards Management** | **Implemented** | 94-test suite: creation, isolation, switching, duplicate, delete flow, cancellation, image safety, migration, project I/O |
 | **Drawing Tools (11 Tools)** | **Implemented** | Automated tool lifecycle & regression tests (236 tests) |
 | **Light & Dark Theme System** | **Implemented** | 32-test suite: Light/Dark/System, persistence, listeners, canvas protection |
 | **Image Upload & Manipulation** | **Implemented** | 59-test suite: formats, sanitization, IndexedDB, transforms, export |

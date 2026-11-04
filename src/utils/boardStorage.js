@@ -186,7 +186,8 @@ export async function getAllBoards() {
       const req = store.getAll();
       req.onsuccess = () => {
         const results = req.result || [];
-        // Update memory cache
+        // Update memory cache strictly in sync with IndexedDB
+        boardsMemoryStorage.clear();
         for (const b of results) {
           boardsMemoryStorage.set(b.id, b);
         }
@@ -252,21 +253,36 @@ export async function cleanupOrphanImages() {
 export async function deleteBoard(boardId) {
   if (!boardId) return false;
 
-  boardsMemoryStorage.delete(boardId);
-
+  let idbSuccess = true;
   try {
     const db = await openBoardsDB();
     if (db) {
-      await new Promise((resolve) => {
+      idbSuccess = await new Promise((resolve) => {
         const tx = db.transaction(BOARDS_STORE, 'readwrite');
-        tx.objectStore(BOARDS_STORE).delete(boardId);
+        const store = tx.objectStore(BOARDS_STORE);
+        const req = store.delete(boardId);
         tx.oncomplete = () => resolve(true);
-        tx.onerror = () => resolve(false);
+        tx.onerror = (e) => {
+          console.error('IndexedDB transaction error deleting board:', tx.error || e);
+          resolve(false);
+        };
+        req.onerror = (e) => {
+          console.error('IndexedDB request error deleting board:', req.error || e);
+          resolve(false);
+        };
       });
     }
   } catch (err) {
-    console.warn('Error deleting board from IndexedDB:', err);
+    console.error('Error deleting board from IndexedDB:', err);
+    idbSuccess = false;
   }
+
+  if (!idbSuccess) {
+    return false;
+  }
+
+  // Only remove from memory cache if persistence succeeded
+  boardsMemoryStorage.delete(boardId);
 
   // Safe orphan image cleanup: only removes assets no longer referenced by ANY board
   await cleanupOrphanImages();

@@ -47,6 +47,13 @@ function debouncedSave(state) {
       const currentState = useCanvasStore.getState();
       const boardId = currentState.activeBoardId || 'board_default';
 
+      // Safety guard: do not debounced-save a board that was deleted
+      const list = currentState.boardsList;
+      if (list && list.length > 0 && !list.some((b) => b.id === boardId)) {
+        useCanvasStore.setState({ saveStatus: 'saved' });
+        return;
+      }
+
       const boardRecord = {
         id: boardId,
         name: currentState.activeBoardName || 'Untitled Board',
@@ -714,6 +721,12 @@ export const useCanvasStore = create((set, get) => ({
     const currentState = get();
     const boardId = currentState.activeBoardId || 'board_default';
 
+    // Safety guard: do not flush-save a board that was deleted
+    const list = currentState.boardsList;
+    if (list && list.length > 0 && !list.some((b) => b.id === boardId)) {
+      return;
+    }
+
     const boardRecord = {
       id: boardId,
       name: currentState.activeBoardName || 'Untitled Board',
@@ -789,16 +802,27 @@ export const useCanvasStore = create((set, get) => ({
 
   /**
    * Switch to another board by ID
+   * @param {string} boardId Target board ID
+   * @param {object} [options]
+   * @param {boolean} [options.skipFlush=false] Skip flushing current board (e.g. when current board was deleted)
    */
-  switchBoard: async (boardId) => {
-    if (!boardId || boardId === get().activeBoardId) return true;
+  switchBoard: async (boardId, options = {}) => {
+    const { skipFlush = false } = options;
+    if (!boardId || (boardId === get().activeBoardId && !skipFlush)) return true;
 
-    // 1. Immediately flush save the active board so no work is lost
-    await get().flushSaveCurrentBoard();
+    // 1. Immediately flush save the active board so no work is lost (unless skipping)
+    if (!skipFlush) {
+      await get().flushSaveCurrentBoard();
+    } else {
+      if (saveDebounceTimer) {
+        clearTimeout(saveDebounceTimer);
+        saveDebounceTimer = null;
+      }
+    }
 
-    // Cache current board's history stack before switching away
+    // Cache current board's history stack before switching away (only if not skipping flush)
     const currentId = get().activeBoardId;
-    if (currentId) {
+    if (currentId && !skipFlush) {
       boardHistoryCache.set(currentId, {
         history: JSON.parse(JSON.stringify(get().history)),
         historyIndex: get().historyIndex
@@ -937,23 +961,42 @@ export const useCanvasStore = create((set, get) => ({
   deleteBoard: async (boardId) => {
     if (!boardId) return false;
 
+    // 1. Clear any pending debounced save immediately to prevent race conditions
+    if (saveDebounceTimer) {
+      clearTimeout(saveDebounceTimer);
+      saveDebounceTimer = null;
+    }
+
     const isActive = boardId === get().activeBoardId;
 
-    // Delete from storage and clear cached history
-    boardHistoryCache.delete(boardId);
-    await deleteBoardStorage(boardId);
+    // 2. Perform persistent deletion in IndexedDB first
+    const success = await deleteBoardStorage(boardId);
+    if (!success) {
+      throw new Error(`Failed to delete board "${boardId}" from persistent storage.`);
+    }
 
+    // 3. Clear cached undo/redo history for deleted board
+    boardHistoryCache.delete(boardId);
+
+    // 4. Update boardsList state immediately from persistent storage
     const remaining = await getAllBoardsMetadata();
     set({ boardsList: remaining });
 
+    // 5. Handle active board deletion
     if (isActive) {
       if (remaining.length > 0) {
-        // Switch to the first remaining board
-        await get().switchBoard(remaining[0].id);
+        // Switch to the first remaining board with skipFlush: true to prevent resurrecting deleted board
+        await get().switchBoard(remaining[0].id, { skipFlush: true });
       } else {
         // Last board was deleted: create a fresh default board
         const freshBoard = await createDefaultBoard('Untitled Board');
         setActiveBoardId(freshBoard.id);
+
+        boardHistoryCache.set(freshBoard.id, {
+          history: [[]],
+          historyIndex: 0
+        });
+
         set({
           activeBoardId: freshBoard.id,
           activeBoardName: freshBoard.name,
@@ -966,6 +1009,16 @@ export const useCanvasStore = create((set, get) => ({
           historyIndex: 0,
           saveStatus: 'saved'
         });
+
+        // Sync legacy localStorage
+        saveToStorage({
+          elements: [],
+          panOffset: { x: 0, y: 0 },
+          zoom: 1,
+          gridType: 'dots',
+          elementProperties: get().toolProperties
+        });
+
         await get().refreshBoardsList();
       }
     }
