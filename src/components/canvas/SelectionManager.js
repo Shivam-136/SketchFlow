@@ -130,6 +130,41 @@ export class SelectionManager {
           cloned.width = metrics.width;
           cloned.height = metrics.height;
         }
+      } else if (cloned.type === 'image') {
+        if (this.initialElements.length === 1) {
+          const lockAspect = cloned.lockAspectRatio !== false;
+          if (lockAspect) {
+            const aspect = (origEl.width || 100) / (origEl.height || 100);
+            let targetW = newWidth;
+            let targetH = newHeight;
+
+            if (this.activeHandle === 'e' || this.activeHandle === 'w') {
+              targetH = Math.max(10, Math.round(targetW / aspect));
+            } else if (this.activeHandle === 'n' || this.activeHandle === 's') {
+              targetW = Math.max(10, Math.round(targetH * aspect));
+            } else {
+              // Diagonal handles: preserve aspect based on scale
+              const s = Math.max(newWidth / (origEl.width || 1), newHeight / (origEl.height || 1));
+              targetW = Math.max(10, Math.round((origEl.width || 1) * s));
+              targetH = Math.max(10, Math.round((origEl.height || 1) * s));
+            }
+
+            cloned.x = minX;
+            cloned.y = minY;
+            cloned.width = targetW;
+            cloned.height = targetH;
+          } else {
+            cloned.x = minX;
+            cloned.y = minY;
+            cloned.width = newWidth;
+            cloned.height = newHeight;
+          }
+        } else {
+          cloned.x = minX + (orig.width > 0 ? (origEl.x - orig.minX) * scaleX : 0);
+          cloned.y = minY + (orig.height > 0 ? (origEl.y - orig.minY) * scaleY : 0);
+          cloned.width = Math.max(10, Math.round(origEl.width * scaleX));
+          cloned.height = Math.max(10, Math.round(origEl.height * scaleY));
+        }
       }
 
       return cloned;

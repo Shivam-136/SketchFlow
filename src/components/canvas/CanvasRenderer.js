@@ -3,6 +3,8 @@
  * Supports clean architectural lines, organic sketchy lines, solid/semi/hachure fills.
  */
 
+import { getImageFromCache } from '../../utils/imageStorage.js';
+
 // Helper: Pseudo-random generator with seed for consistent hand-drawn jitter
 function pseudoRandom(seed) {
   const x = Math.sin(seed++) * 10000;
@@ -359,9 +361,69 @@ export function renderElementOnContext(ctx, el) {
       break;
     }
 
+    case 'image': {
+      renderImageOnContext(ctx, el);
+      break;
+    }
+
     default:
       break;
   }
+
+  ctx.restore();
+}
+
+/**
+ * Draws image element with rotation and loading placeholder fallback
+ */
+export function renderImageOnContext(ctx, el) {
+  if (!el || !el.width || !el.height) return;
+
+  const w = el.width;
+  const h = el.height;
+  const cx = el.x + w / 2;
+  const cy = el.y + h / 2;
+  const rad = el.angle ? (el.angle * Math.PI) / 180 : 0;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  if (rad !== 0) {
+    ctx.rotate(rad);
+  }
+
+  const cached = getImageFromCache(el.fileId);
+
+  if (cached && cached.status === 'loaded' && cached.element) {
+    try {
+      ctx.drawImage(cached.element, -w / 2, -h / 2, w, h);
+    } catch (err) {
+      drawPlaceholder(ctx, w, h, 'error');
+    }
+  } else if (cached && cached.status === 'error') {
+    drawPlaceholder(ctx, w, h, 'error');
+  } else {
+    // Loading / pending
+    drawPlaceholder(ctx, w, h, 'loading');
+  }
+
+  ctx.restore();
+}
+
+function drawPlaceholder(ctx, w, h, status) {
+  ctx.save();
+  ctx.strokeStyle = status === 'error' ? '#ef4444' : '#a1a1aa';
+  ctx.fillStyle = status === 'error' ? 'rgba(239, 68, 68, 0.05)' : '#f4f4f5';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 4]);
+
+  ctx.fillRect(-w / 2, -h / 2, w, h);
+  ctx.strokeRect(-w / 2, -h / 2, w, h);
+
+  ctx.fillStyle = status === 'error' ? '#ef4444' : '#71717a';
+  ctx.font = '12px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(status === 'error' ? 'Image unavailable' : 'Loading image...', 0, 0);
 
   ctx.restore();
 }

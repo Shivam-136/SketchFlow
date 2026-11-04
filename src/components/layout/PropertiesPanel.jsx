@@ -11,7 +11,12 @@ import {
   Sliders,
   Sparkles,
   Square,
-  Hash
+  Hash,
+  RotateCw,
+  RotateCcw,
+  Lock,
+  Unlock,
+  Image as ImageIcon
 } from 'lucide-react';
 import { useCanvasStore } from '../../store/canvasStore';
 import { ColorPicker } from '../common/ColorPicker';
@@ -21,6 +26,7 @@ export function PropertiesPanel() {
   const activeTool = useCanvasStore((s) => s.activeTool);
   const selectedIds = useCanvasStore((s) => s.selectedIds);
   const elements = useCanvasStore((s) => s.elements);
+  const updateElement = useCanvasStore((s) => s.updateElement);
   const toolProperties = useCanvasStore((s) => s.toolProperties);
   const updateToolProperties = useCanvasStore((s) => s.updateToolProperties);
   const deleteSelected = useCanvasStore((s) => s.deleteSelected);
@@ -36,10 +42,14 @@ export function PropertiesPanel() {
   const isMultipleSelected = selectedElements.length > 1;
 
   // Decide which property sections to show
-  const isTextMode = activeTool === 'text' || (hasSelection && selectedElements.some((e) => e.type === 'text'));
-  const isLineOrArrow = activeTool === 'line' || activeTool === 'arrow' || (hasSelection && selectedElements.every((e) => e.type === 'line' || e.type === 'arrow'));
-  const isPencilMode = activeTool === 'pencil' || (hasSelection && selectedElements.every((e) => e.type === 'pencil'));
-  const isShapeMode = !isTextMode && !isLineOrArrow && !isPencilMode;
+  const isImageMode = hasSelection && selectedElements.some((e) => e.type === 'image');
+  const isOnlyImage = hasSelection && selectedElements.every((e) => e.type === 'image');
+  const selectedImage = isOnlyImage && selectedElements.length === 1 ? selectedElements[0] : null;
+
+  const isTextMode = !isOnlyImage && (activeTool === 'text' || (hasSelection && selectedElements.some((e) => e.type === 'text')));
+  const isLineOrArrow = !isOnlyImage && (activeTool === 'line' || activeTool === 'arrow' || (hasSelection && selectedElements.every((e) => e.type === 'line' || e.type === 'arrow')));
+  const isPencilMode = !isOnlyImage && (activeTool === 'pencil' || (hasSelection && selectedElements.every((e) => e.type === 'pencil')));
+  const isShapeMode = !isOnlyImage && !isTextMode && !isLineOrArrow && !isPencilMode;
 
   // If hand tool is active and nothing is selected, hide properties panel
   if (activeTool === 'hand' && !hasSelection) {
@@ -54,19 +64,158 @@ export function PropertiesPanel() {
       {/* Header info */}
       <div className="flex items-center justify-between pb-1 border-b border-zinc-100">
         <span className="font-semibold text-zinc-800 text-[11px] uppercase tracking-wider flex items-center gap-1.5">
-          <Sliders className="w-3.5 h-3.5 text-indigo-600" />
+          {isOnlyImage ? (
+            <ImageIcon className="w-3.5 h-3.5 text-indigo-600" />
+          ) : (
+            <Sliders className="w-3.5 h-3.5 text-indigo-600" />
+          )}
           {hasSelection
-            ? `${selectedElements.length} Selected`
+            ? isOnlyImage
+              ? 'Image Properties'
+              : `${selectedElements.length} Selected`
             : `${activeTool.charAt(0).toUpperCase() + activeTool.slice(1)} Style`}
         </span>
       </div>
 
-      {/* Stroke Color */}
-      <ColorPicker
-        label="Stroke Color"
-        value={toolProperties.strokeColor}
-        onChange={(color) => updateToolProperties({ strokeColor: color })}
-      />
+      {/* Image Properties */}
+      {isOnlyImage && selectedImage && (
+        <div className="flex flex-col gap-3">
+          {/* Dimensions */}
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center justify-between text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">
+              <span>Dimensions</span>
+              <button
+                type="button"
+                onClick={() =>
+                  updateElement(
+                    selectedImage.id,
+                    { lockAspectRatio: selectedImage.lockAspectRatio === false ? true : false },
+                    true
+                  )
+                }
+                title={selectedImage.lockAspectRatio !== false ? 'Aspect ratio locked' : 'Aspect ratio unlocked'}
+                className={`p-1 rounded flex items-center gap-1 text-[10px] font-medium transition-colors ${
+                  selectedImage.lockAspectRatio !== false
+                    ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                    : 'bg-zinc-100 text-zinc-600 hover:text-zinc-900'
+                }`}
+              >
+                {selectedImage.lockAspectRatio !== false ? (
+                  <>
+                    <Lock className="w-3 h-3 text-indigo-600" />
+                    <span>Locked</span>
+                  </>
+                ) : (
+                  <>
+                    <Unlock className="w-3 h-3 text-zinc-500" />
+                    <span>Unlocked</span>
+                  </>
+                )}
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="flex items-center gap-1 bg-zinc-100 px-2 py-1.5 rounded-lg border border-zinc-200 text-zinc-600 text-xs">
+                <span className="text-[10px] font-bold text-zinc-400">W</span>
+                <input
+                  type="number"
+                  min="10"
+                  max="5000"
+                  value={Math.round(selectedImage.width)}
+                  onChange={(e) => {
+                    const newW = Math.max(10, parseInt(e.target.value) || 10);
+                    if (selectedImage.lockAspectRatio !== false) {
+                      const ratio = (selectedImage.naturalWidth / selectedImage.naturalHeight) || (selectedImage.width / selectedImage.height) || 1;
+                      const newH = Math.max(10, Math.round(newW / ratio));
+                      updateElement(selectedImage.id, { width: newW, height: newH }, true);
+                    } else {
+                      updateElement(selectedImage.id, { width: newW }, true);
+                    }
+                  }}
+                  className="w-full bg-transparent outline-none font-mono text-zinc-800 text-xs"
+                />
+              </label>
+              <label className="flex items-center gap-1 bg-zinc-100 px-2 py-1.5 rounded-lg border border-zinc-200 text-zinc-600 text-xs">
+                <span className="text-[10px] font-bold text-zinc-400">H</span>
+                <input
+                  type="number"
+                  min="10"
+                  max="5000"
+                  value={Math.round(selectedImage.height)}
+                  onChange={(e) => {
+                    const newH = Math.max(10, parseInt(e.target.value) || 10);
+                    if (selectedImage.lockAspectRatio !== false) {
+                      const ratio = (selectedImage.naturalWidth / selectedImage.naturalHeight) || (selectedImage.width / selectedImage.height) || 1;
+                      const newW = Math.max(10, Math.round(newH * ratio));
+                      updateElement(selectedImage.id, { width: newW, height: newH }, true);
+                    } else {
+                      updateElement(selectedImage.id, { height: newH }, true);
+                    }
+                  }}
+                  className="w-full bg-transparent outline-none font-mono text-zinc-800 text-xs"
+                />
+              </label>
+            </div>
+            <div className="flex items-center justify-between text-[10px] text-zinc-600 px-0.5">
+              <span>Ratio: {(selectedImage.width / (selectedImage.height || 1)).toFixed(2)} : 1</span>
+              {selectedImage.naturalWidth && (
+                <span>Original: {selectedImage.naturalWidth}x{selectedImage.naturalHeight}</span>
+              )}
+            </div>
+          </div>
+
+          {/* Rotation */}
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center justify-between text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">
+              <span>Rotation</span>
+              <span className="font-mono text-zinc-700">{selectedImage.angle || 0}°</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <input
+                type="range"
+                min="-180"
+                max="180"
+                step="5"
+                value={selectedImage.angle || 0}
+                onChange={(e) => updateElement(selectedImage.id, { angle: parseInt(e.target.value) || 0 }, false)}
+                onPointerUp={() => {
+                  const { elements, pushHistory } = useCanvasStore.getState();
+                  pushHistory(elements);
+                }}
+                className="w-full accent-indigo-600 cursor-pointer h-1.5 bg-zinc-200 rounded-lg appearance-none"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const cur = selectedImage.angle || 0;
+                  const next = (cur + 90) % 360;
+                  updateElement(selectedImage.id, { angle: next }, true);
+                }}
+                title="Rotate 90° Clockwise"
+                className="p-1 rounded border border-zinc-200 hover:bg-zinc-100 text-zinc-600"
+              >
+                <RotateCw className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => updateElement(selectedImage.id, { angle: 0 }, true)}
+                title="Reset Rotation to 0°"
+                className="px-1.5 py-0.5 text-[10px] font-mono rounded border border-zinc-200 hover:bg-zinc-100 text-zinc-600"
+              >
+                0°
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!isOnlyImage && (
+        <>
+          {/* Stroke Color */}
+          <ColorPicker
+            label="Stroke Color"
+            value={toolProperties.strokeColor}
+            onChange={(color) => updateToolProperties({ strokeColor: color })}
+          />
 
       {/* Background / Fill Color (for shapes) */}
       {!isLineOrArrow && !isPencilMode && !isTextMode && (
@@ -309,6 +458,8 @@ export function PropertiesPanel() {
           </div>
         </>
       )}
+      </>
+    )}
 
       {/* Opacity slider */}
       <div className="flex flex-col gap-1.5">

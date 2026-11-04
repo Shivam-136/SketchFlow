@@ -150,8 +150,13 @@ export function useKeyboardShortcuts() {
           e.preventDefault();
           setActiveTool('text');
           break;
-        case 'e':
         case '9':
+          e.preventDefault();
+          const imgInput = document.querySelector('input[type="file"][accept*="image"]');
+          if (imgInput) imgInput.click();
+          break;
+        case 'e':
+        case '0':
           e.preventDefault();
           setActiveTool('eraser');
           break;

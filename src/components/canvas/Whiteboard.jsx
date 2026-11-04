@@ -5,6 +5,8 @@ import { renderElementOnContext, renderSelectionBox, renderMarquee } from './Can
 import { screenToCanvas, canvasToScreen, drawGrid, measureText, generateId } from '../../utils/canvasUtils.js';
 import { getElementsBounds } from '../../utils/geometryUtils.js';
 import { hitTestElement } from '../../utils/hitTestUtils.js';
+import { registerRedrawCallback } from '../../utils/imageStorage.js';
+import { isSupportedImageFile, createImageElementFromFile } from '../../utils/imageUtils.js';
 
 export function Whiteboard() {
   const canvasRef = useRef(null);
@@ -131,6 +133,60 @@ export function Whiteboard() {
   useEffect(() => {
     renderCanvas();
   }, [renderCanvas]);
+
+  // Re-render whenever an image asset finishes loading asynchronously
+  useEffect(() => {
+    return registerRedrawCallback(() => {
+      renderCanvas();
+    });
+  }, [renderCanvas]);
+
+  // Handle image files pasted from clipboard (Ctrl + V)
+  useEffect(() => {
+    const handlePaste = async (e) => {
+      const activeEl = document.activeElement;
+      if (
+        activeEl &&
+        (activeEl.tagName === 'INPUT' ||
+          activeEl.tagName === 'TEXTAREA' ||
+          activeEl.isContentEditable)
+      ) {
+        return;
+      }
+
+      const items = Array.from(e.clipboardData?.items || []);
+      const imageItems = items.filter((item) => item.type && item.type.startsWith('image/'));
+
+      if (imageItems.length > 0) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const centerScreen = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+        const centerCanvas = screenToCanvas(centerScreen.x, centerScreen.y, panOffset, zoom);
+
+        for (let i = 0; i < imageItems.length; i++) {
+          const file = imageItems[i].getAsFile();
+          if (file) {
+            try {
+              const offsetPoint = {
+                x: centerCanvas.x + i * 25,
+                y: centerCanvas.y + i * 25
+              };
+              const newEl = await createImageElementFromFile(file, offsetPoint);
+              addElement(newEl);
+              setSelectedIds([newEl.id]);
+              setActiveTool('selection');
+            } catch (err) {
+              alert(err.message || 'Failed to paste image.');
+            }
+          }
+        }
+      }
+    };
+
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, [panOffset, zoom, addElement, setSelectedIds, setActiveTool]);
 
   // Transform client coordinates to canvas world coordinates
   const getCanvasPoint = (clientX, clientY) => {
@@ -470,12 +526,48 @@ export function Whiteboard() {
     ? measureText(editingText.text || 'Type text...', editingText.fontSize, editingText.fontFamily)
     : { width: 120, height: 32 };
 
+  // Handle dropping images onto the canvas
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'copy';
+  };
+
+  const handleDrop = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const files = Array.from(e.dataTransfer?.files || []);
+    const imageFiles = files.filter(isSupportedImageFile);
+    if (imageFiles.length === 0) return;
+
+    const basePoint = getCanvasPoint(e.clientX, e.clientY);
+
+    for (let i = 0; i < imageFiles.length; i++) {
+      const file = imageFiles[i];
+      try {
+        const offsetPoint = {
+          x: basePoint.x + i * 25,
+          y: basePoint.y + i * 25
+        };
+        const newEl = await createImageElementFromFile(file, offsetPoint);
+        addElement(newEl);
+        setSelectedIds([newEl.id]);
+        setActiveTool('selection');
+      } catch (err) {
+        alert(err.message || 'Failed to upload dropped image.');
+      }
+    }
+  };
+
   return (
     <div
       ref={containerRef}
       className="relative w-full h-full overflow-hidden select-none bg-[#fbfbfa]"
       style={{ cursor: cursorStyle }}
       onWheel={handleWheel}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
     >
       <canvas
         ref={canvasRef}

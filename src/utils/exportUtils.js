@@ -1,5 +1,12 @@
 import { getElementsBounds } from './geometryUtils.js';
 import { renderElementOnContext } from '../components/canvas/CanvasRenderer.js';
+import {
+  loadImageAsset,
+  getImageBase64Sync,
+  getImageRecordSync,
+  saveImageBlob,
+  base64ToBlob
+} from './imageStorage.js';
 
 /**
  * Trigger file download in browser
@@ -37,6 +44,16 @@ export async function exportToPNG(elements, options = {}) {
       await document.fonts.ready;
     } catch (e) {
       // Ignore if document.fonts.ready fails
+    }
+  }
+
+  // Ensure image assets are loaded before rasterizing
+  const imageElements = elements.filter((e) => e.type === 'image');
+  if (imageElements.length > 0) {
+    try {
+      await Promise.all(imageElements.map((el) => loadImageAsset(el.fileId)));
+    } catch (e) {
+      // Ignore image loading errors
     }
   }
 
@@ -200,6 +217,20 @@ ${defs}`;
         svgContent += `  </text>\n`;
         break;
       }
+      case 'image': {
+        const base64 = getImageBase64Sync(el.fileId);
+        if (base64) {
+          const x = el.x;
+          const y = el.y;
+          const w = el.width;
+          const h = el.height;
+          const cx = x + w / 2;
+          const cy = y + h / 2;
+          const transform = el.angle ? `transform="rotate(${el.angle} ${cx} ${cy})"` : '';
+          svgContent += `  <image href="${base64}" x="${x}" y="${y}" width="${w}" height="${h}" opacity="${opacity}" ${transform} preserveAspectRatio="none" />\n`;
+        }
+        break;
+      }
       default:
         break;
     }
@@ -225,15 +256,30 @@ function escapeXml(unsafe) {
 }
 
 /**
- * Export drawing as JSON file
+ * Export drawing as JSON file with bundled image assets
  */
 export function exportToJSON(elements, appState = {}, filename = `sketchflow-${Date.now()}.sketchflow`) {
+  const assets = {};
+
+  for (const el of elements) {
+    if (el.type === 'image' && el.fileId) {
+      const rec = getImageRecordSync(el.fileId);
+      if (rec && rec.base64) {
+        assets[el.fileId] = {
+          mimeType: rec.mimeType || 'image/png',
+          base64: rec.base64
+        };
+      }
+    }
+  }
+
   const data = {
     type: 'sketchflow',
     version: 1,
     source: 'https://sketchflow.app',
     exportedAt: new Date().toISOString(),
     elements,
+    assets: Object.keys(assets).length > 0 ? assets : undefined,
     appState: {
       gridType: appState.gridType || 'dots',
       viewBackgroundColor: appState.viewBackgroundColor || '#fbfbfa'
@@ -245,7 +291,7 @@ export function exportToJSON(elements, appState = {}, filename = `sketchflow-${D
 }
 
 /**
- * Parse and validate imported JSON drawing
+ * Parse and validate imported JSON drawing, restoring image assets into storage
  */
 export function importFromJSON(fileContent) {
   try {
@@ -254,22 +300,49 @@ export function importFromJSON(fileContent) {
       throw new Error('Invalid file format: "elements" array is missing.');
     }
 
+    // Restore bundled image assets into IndexedDB & memory cache
+    if (data.assets && typeof data.assets === 'object') {
+      for (const [fileId, asset] of Object.entries(data.assets)) {
+        if (asset && asset.base64) {
+          const mimeType = asset.mimeType || 'image/png';
+          const blob = base64ToBlob(asset.base64, mimeType);
+          if (blob) {
+            saveImageBlob(fileId, blob, mimeType, asset.base64);
+            loadImageAsset(fileId);
+          }
+        }
+      }
+    }
+
     // Sanitize elements
-    const sanitized = data.elements.map((el, i) => ({
-      ...el,
-      id: el.id || `imported_${i}_${Date.now()}`,
-      type: el.type || 'rectangle',
-      x: Number(el.x) || 0,
-      y: Number(el.y) || 0,
-      width: Number(el.width) || 0,
-      height: Number(el.height) || 0,
-      strokeColor: el.strokeColor || '#1e1e1e',
-      backgroundColor: el.backgroundColor || 'transparent',
-      strokeWidth: Number(el.strokeWidth) || 2,
-      strokeStyle: el.strokeStyle || 'solid',
-      fillStyle: el.fillStyle || 'none',
-      opacity: el.opacity !== undefined ? Number(el.opacity) : 100
-    }));
+    const sanitized = data.elements.map((el, i) => {
+      const baseEl = {
+        ...el,
+        id: el.id || `imported_${i}_${Date.now()}`,
+        type: el.type || 'rectangle',
+        x: Number(el.x) || 0,
+        y: Number(el.y) || 0,
+        width: Number(el.width) || 0,
+        height: Number(el.height) || 0,
+        strokeColor: el.strokeColor || '#1e1e1e',
+        backgroundColor: el.backgroundColor || 'transparent',
+        strokeWidth: Number(el.strokeWidth) || 2,
+        strokeStyle: el.strokeStyle || 'solid',
+        fillStyle: el.fillStyle || 'none',
+        opacity: el.opacity !== undefined ? Number(el.opacity) : 100
+      };
+
+      if (el.type === 'image') {
+        baseEl.fileId = el.fileId;
+        baseEl.angle = Number(el.angle) || 0;
+        baseEl.naturalWidth = Number(el.naturalWidth) || Number(el.width) || 300;
+        baseEl.naturalHeight = Number(el.naturalHeight) || Number(el.height) || 200;
+        baseEl.lockAspectRatio = el.lockAspectRatio !== false;
+        baseEl.mimeType = el.mimeType || 'image/png';
+      }
+
+      return baseEl;
+    });
 
     return {
       elements: sanitized,

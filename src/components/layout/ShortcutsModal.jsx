@@ -15,6 +15,7 @@ const SHORTCUT_GROUPS = [
       { key: 'L', desc: 'Line' },
       { key: 'P', desc: 'Pencil (Freehand)' },
       { key: 'T', desc: 'Text' },
+      { key: '9', desc: 'Upload Image' },
       { key: 'E', desc: 'Eraser' },
     ]
   },

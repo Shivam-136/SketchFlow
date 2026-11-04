@@ -70,7 +70,44 @@ export function getElementBounds(el) {
     };
   }
 
-  // Rectangle, circle, diamond, text
+  if (el.type === 'image' && el.angle) {
+    const cx = el.x + (el.width || 0) / 2;
+    const cy = el.y + (el.height || 0) / 2;
+    const rad = (el.angle * Math.PI) / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+    const hw = (el.width || 0) / 2;
+    const hh = (el.height || 0) / 2;
+
+    const corners = [
+      { x: -hw, y: -hh },
+      { x: hw, y: -hh },
+      { x: hw, y: hh },
+      { x: -hw, y: hh }
+    ].map((pt) => ({
+      x: cx + pt.x * cos - pt.y * sin,
+      y: cy + pt.x * sin + pt.y * cos
+    }));
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const c of corners) {
+      if (c.x < minX) minX = c.x;
+      if (c.y < minY) minY = c.y;
+      if (c.x > maxX) maxX = c.x;
+      if (c.y > maxY) maxY = c.y;
+    }
+
+    return {
+      minX,
+      minY,
+      maxX,
+      maxY,
+      width: maxX - minX,
+      height: maxY - minY
+    };
+  }
+
+  // Rectangle, circle, diamond, text, unrotated image
   const x = Math.min(el.x, el.x + (el.width || 0));
   const y = Math.min(el.y, el.y + (el.height || 0));
   const w = Math.abs(el.width || 0);

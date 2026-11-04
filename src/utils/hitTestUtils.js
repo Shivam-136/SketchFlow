@@ -127,6 +127,28 @@ export function hitTestElement(x, y, el, zoom = 1) {
       );
     }
 
+    case 'image': {
+      if (el.angle) {
+        const cx = el.x + (el.width || 0) / 2;
+        const cy = el.y + (el.height || 0) / 2;
+        const rad = -(el.angle * Math.PI) / 180;
+        const dx = x - cx;
+        const dy = y - cy;
+        const rx = dx * Math.cos(rad) - dy * Math.sin(rad) + cx;
+        const ry = dx * Math.sin(rad) + dy * Math.cos(rad) + cy;
+        const bx = Math.min(el.x, el.x + el.width);
+        const by = Math.min(el.y, el.y + el.height);
+        const bw = Math.abs(el.width);
+        const bh = Math.abs(el.height);
+        return rx >= bx - tol && rx <= bx + bw + tol && ry >= by - tol && ry <= by + bh + tol;
+      }
+      const bx = Math.min(el.x, el.x + el.width);
+      const by = Math.min(el.y, el.y + el.height);
+      const bw = Math.abs(el.width);
+      const bh = Math.abs(el.height);
+      return x >= bx - tol && x <= bx + bw + tol && y >= by - tol && y <= by + bh + tol;
+    }
+
     default:
       return false;
   }
